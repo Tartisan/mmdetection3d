@@ -121,7 +121,7 @@ For evaluation on Waymo, please follow the [instruction](https://github.com/waym
    # delete previous bazel outputs and reset internal caches
    bazel clean
 
-   bazel build waymo_open_dataset/metrics/tools/compute_detection_metrics_main
+   bazel build waymo_open_dataset/metrics/tools/compute_detection_metrics_main --cxxopt="-std=c++17"
    cp bazel-bin/waymo_open_dataset/metrics/tools/compute_detection_metrics_main ../mmdetection3d/mmdet3d/core/evaluation/waymo_utils/
    ```
 

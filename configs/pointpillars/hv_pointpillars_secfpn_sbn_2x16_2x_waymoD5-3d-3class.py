@@ -4,3 +4,12 @@ _base_ = [
     '../_base_/schedules/schedule_2x.py',
     '../_base_/default_runtime.py',
 ]
+
+data = dict(
+    samples_per_gpu=2,
+    workers_per_gpu=4,
+    train=dict(
+        dataset=dict(
+            load_interval=20)))
+
+# runner = dict(max_epochs=48)

@@ -83,6 +83,8 @@ class WaymoDataset(KittiDataset):
             **kwargs)
 
         # to load a subset, just set the load_interval in the dataset config
+        ## self.data_infos.keys()
+        #       dict_keys(['timestamp', 'image', 'point_cloud', 'calib', 'pose', 'annos', 'sweeps'])
         self.data_infos = self.data_infos[::load_interval]
         if hasattr(self, 'flag'):
             self.flag = self.flag[::load_interval]

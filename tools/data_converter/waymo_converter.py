@@ -3,6 +3,7 @@ r"""Adapted from `Waymo to KITTI converter
     <https://github.com/caizhongang/waymo_kitti_converter>`_.
 """
 
+import tensorflow as tf
 try:
     from waymo_open_dataset import dataset_pb2
 except ImportError:
@@ -15,7 +16,6 @@ from os.path import join
 
 import mmcv
 import numpy as np
-import tensorflow as tf
 from waymo_open_dataset.utils import range_image_utils, transform_utils
 from waymo_open_dataset.utils.frame_utils import \
     parse_range_image_and_camera_projection

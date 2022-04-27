@@ -5,6 +5,7 @@ import warnings
 
 import mmcv
 import torch
+from torch import distributed as dist
 from mmcv import Config, DictAction
 from mmcv.cnn import fuse_conv_bn
 from mmcv.parallel import MMDataParallel, MMDistributedDataParallel

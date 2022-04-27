@@ -1,7 +1,7 @@
 # Copyright (c) OpenMMLab. All rights reserved.
 import torch
 from mmcv.cnn import NORM_LAYERS
-from mmcv.runner import force_fp32
+from mmcv.runner import force_fp32, get_dist_info
 from torch import distributed as dist
 from torch import nn as nn
 from torch.autograd.function import Function
@@ -55,7 +55,8 @@ class NaiveSyncBatchNorm1d(nn.BatchNorm1d):
     def forward(self, input):
         assert input.dtype == torch.float32, \
             f'input should be in float32 type, got {input.dtype}'
-        if dist.get_world_size() == 1 or not self.training:
+        _, world_size = get_dist_info()
+        if world_size == 1 or not self.training:
             return super().forward(input)
         assert input.shape[0] > 0, 'SyncBN does not support empty inputs'
         C = input.shape[1]
@@ -63,7 +64,7 @@ class NaiveSyncBatchNorm1d(nn.BatchNorm1d):
         meansqr = torch.mean(input * input, dim=[0, 2])
 
         vec = torch.cat([mean, meansqr], dim=0)
-        vec = AllReduce.apply(vec) * (1.0 / dist.get_world_size())
+        vec = AllReduce.apply(vec) * (1.0 / world_size)
 
         mean, meansqr = torch.split(vec, C)
         var = meansqr - mean * mean
@@ -109,7 +110,8 @@ class NaiveSyncBatchNorm2d(nn.BatchNorm2d):
     def forward(self, input):
         assert input.dtype == torch.float32, \
             f'input should be in float32 type, got {input.dtype}'
-        if dist.get_world_size() == 1 or not self.training:
+        _, world_size = get_dist_info()
+        if world_size == 1 or not self.training:
             return super().forward(input)
 
         assert input.shape[0] > 0, 'SyncBN does not support empty inputs'
@@ -118,7 +120,7 @@ class NaiveSyncBatchNorm2d(nn.BatchNorm2d):
         meansqr = torch.mean(input * input, dim=[0, 2, 3])
 
         vec = torch.cat([mean, meansqr], dim=0)
-        vec = AllReduce.apply(vec) * (1.0 / dist.get_world_size())
+        vec = AllReduce.apply(vec) * (1.0 / world_size)
 
         mean, meansqr = torch.split(vec, C)
         var = meansqr - mean * mean
