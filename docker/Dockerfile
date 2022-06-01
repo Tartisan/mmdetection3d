@@ -9,12 +9,15 @@ ENV TORCH_NVCC_FLAGS="-Xfatbin -compress-all"
 ENV CMAKE_PREFIX_PATH="$(dirname $(which conda))/../"
 
 COPY docker/files/sources.list /etc/apt/
+# To fix GPG key error when running apt-get update
+RUN apt-key adv --fetch-keys https://developer.download.nvidia.com/compute/cuda/repos/ubuntu1804/x86_64/3bf863cc.pub
+RUN apt-key adv --fetch-keys https://developer.download.nvidia.com/compute/machine-learning/repos/ubuntu1804/x86_64/7fa2af80.pub
 RUN apt-get update && apt-get install -y vim ffmpeg libsm6 libxext6 git ninja-build libglib2.0-0 libsm6 libxrender-dev libxext6 \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
 # Install MMCV, MMDetection and MMSegmentation
-RUN pip install mmcv-full==1.4.8 -f https://download.openmmlab.com/mmcv/dist/cu111/torch1.9.0/index.html
+RUN pip install mmcv-full==1.5.0 -f https://download.openmmlab.com/mmcv/dist/cu111/torch1.9.0/index.html
 RUN pip install mmdet==2.19.0
 RUN pip install mmsegmentation==0.20.0
 
