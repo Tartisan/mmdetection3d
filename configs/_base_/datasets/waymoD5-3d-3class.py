@@ -26,7 +26,7 @@ db_sampler = dict(
         type='LoadPointsFromFile',
         coord_type='LIDAR',
         load_dim=6,
-        use_dim=[0, 1, 2, 3, 4],
+        use_dim=[0, 1, 2, 3],
         file_client_args=file_client_args))
 
 train_pipeline = [
@@ -34,7 +34,7 @@ train_pipeline = [
         type='LoadPointsFromFile',
         coord_type='LIDAR',
         load_dim=6,
-        use_dim=5,
+        use_dim=4,
         file_client_args=file_client_args),
     dict(
         type='LoadAnnotations3D',
@@ -62,7 +62,7 @@ test_pipeline = [
         type='LoadPointsFromFile',
         coord_type='LIDAR',
         load_dim=6,
-        use_dim=5,
+        use_dim=4,
         file_client_args=file_client_args),
     dict(
         type='MultiScaleFlipAug3D',
@@ -92,7 +92,7 @@ eval_pipeline = [
         type='LoadPointsFromFile',
         coord_type='LIDAR',
         load_dim=6,
-        use_dim=5,
+        use_dim=4,
         file_client_args=file_client_args),
     dict(
         type='DefaultFormatBundle3D',
@@ -103,7 +103,7 @@ eval_pipeline = [
 
 data = dict(
     samples_per_gpu=2,
-    workers_per_gpu=4,
+    workers_per_gpu=1,
     train=dict(
         type='RepeatDataset',
         times=2,

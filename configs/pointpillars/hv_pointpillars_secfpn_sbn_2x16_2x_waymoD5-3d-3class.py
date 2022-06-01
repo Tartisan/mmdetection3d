@@ -10,6 +10,6 @@ data = dict(
     workers_per_gpu=4,
     train=dict(
         dataset=dict(
-            load_interval=20)))
+            load_interval=10)))
 
 # runner = dict(max_epochs=48)
