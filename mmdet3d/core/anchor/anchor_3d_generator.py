@@ -191,6 +191,11 @@ class Anchor3DRangeGenerator(object):
             anchor_range[1], anchor_range[4], feature_size[1], device=device)
         x_centers = torch.linspace(
             anchor_range[0], anchor_range[3], feature_size[2], device=device)
+        # x_stride = (anchor_range[3] - anchor_range[0]) / (feature_size[2] - 1)
+        # y_stride = (anchor_range[4] - anchor_range[1]) / (feature_size[1] - 1)
+        # x_centers = torch.arange(anchor_range[0], anchor_range[3]+x_stride, step=x_stride, dtype=torch.float32, device=device)
+        # y_centers = torch.arange(anchor_range[1], anchor_range[4]+y_stride, step=y_stride, dtype=torch.float32, device=device)
+        # z_centers = x_centers.new_tensor([anchor_range[2]])
         sizes = torch.tensor(sizes, device=device).reshape(-1, 3) * scale
         rotations = torch.tensor(rotations, device=device)
 
@@ -284,21 +289,15 @@ class AlignedAnchor3DRangeGenerator(Anchor3DRangeGenerator):
         if len(feature_size) == 2:
             feature_size = [1, feature_size[0], feature_size[1]]
         anchor_range = torch.tensor(anchor_range, device=device)
-        z_centers = torch.linspace(
-            anchor_range[2],
-            anchor_range[5],
-            feature_size[0] + 1,
-            device=device)
-        y_centers = torch.linspace(
-            anchor_range[1],
-            anchor_range[4],
-            feature_size[1] + 1,
-            device=device)
-        x_centers = torch.linspace(
-            anchor_range[0],
-            anchor_range[3],
-            feature_size[2] + 1,
-            device=device)
+        z_centers = torch.linspace(anchor_range[2], anchor_range[5], feature_size[0] + 1, device=device)
+        y_centers = torch.linspace(anchor_range[1], anchor_range[4], feature_size[1] + 1, device=device)
+        x_centers = torch.linspace(anchor_range[0], anchor_range[3], feature_size[2] + 1, device=device)
+        # x_stride = (anchor_range[3] - anchor_range[0]) / feature_size[2]
+        # y_stride = (anchor_range[4] - anchor_range[1]) / feature_size[1]
+        # x_centers = torch.arange(anchor_range[0], anchor_range[3]+x_stride, step=x_stride, dtype=torch.float32, device=device)
+        # y_centers = torch.arange(anchor_range[1], anchor_range[4]+y_stride, step=y_stride, dtype=torch.float32, device=device)
+        # z_centers = x_centers.new_tensor([anchor_range[2], anchor_range[5]])
+        
         sizes = torch.tensor(sizes, device=device).reshape(-1, 3) * scale
         rotations = torch.tensor(rotations, device=device)
 

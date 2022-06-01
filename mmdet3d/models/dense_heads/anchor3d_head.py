@@ -453,7 +453,8 @@ class Anchor3DHead(BaseModule, AnchorTrainMixin):
                 - scores (torch.Tensor): Class score of each bbox.
                 - labels (torch.Tensor): Label of each bbox.
         """
-        cfg = self.test_cfg if cfg is None else cfg
+        cfg = cfg if cfg is not None else (self.test_cfg.pts if 'pts' in self.test_cfg else self.test_cfg)
+        cfg = self.test_cfg.pts if cfg is None else cfg
         assert len(cls_scores) == len(bbox_preds) == len(mlvl_anchors)
         mlvl_bboxes = []
         mlvl_scores = []

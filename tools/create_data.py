@@ -194,6 +194,44 @@ def waymo_data_prep(root_path,
         num_worker=workers).create()
 
 
+def aicv_data_prep(root_path,
+                   info_prefix,
+                   version,
+                   out_dir,
+                   workers,
+                   max_sweeps=1):
+    """Prepare the info file for waymo dataset.
+
+    Args:
+        root_path (str): Path of dataset root.
+        info_prefix (str): The prefix of info filenames.
+        out_dir (str): Output directory of the generated info file.
+        workers (int): Number of threads to be used.
+        max_sweeps (int, optional): Number of input consecutive frames.
+            Default: 5. Here we store pose information of these frames
+            for later use.
+    """
+    from tools.data_converter import aicv_converter as aicv
+
+    save_dir = osp.join(out_dir, 'kitti_format', 'training')
+    converter = aicv.AICV2KITTI(
+        root_path,
+        save_dir,
+        test_mode=False)
+    converter.convert()
+    # Generate aicv infos
+    out_dir = osp.join(out_dir, 'kitti_format')
+    kitti.create_aicv_info_file(
+        out_dir, info_prefix, max_sweeps=max_sweeps, workers=workers)
+    create_groundtruth_database(
+        'AicvDataset',
+        out_dir,
+        info_prefix,
+        f'{out_dir}/{info_prefix}_infos_train.pkl',
+        relative_path=False,
+        with_mask=False)
+
+
 parser = argparse.ArgumentParser(description='Data converter arg parser')
 parser.add_argument('dataset', metavar='kitti', help='name of the dataset')
 parser.add_argument(
@@ -299,5 +337,12 @@ if __name__ == '__main__':
         sunrgbd_data_prep(
             root_path=args.root_path,
             info_prefix=args.extra_tag,
+            out_dir=args.out_dir,
+            workers=args.workers)
+    elif args.dataset == 'aicv':
+        aicv_data_prep(
+            root_path=args.root_path,
+            info_prefix=args.extra_tag,
+            version=args.version,
             out_dir=args.out_dir,
             workers=args.workers)

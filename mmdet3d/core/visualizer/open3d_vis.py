@@ -188,6 +188,28 @@ def show_pts_boxes(points,
     vis.destroy_window()
 
 
+def add_pts_boxes(vis, 
+                  points,
+                  bbox3d=None,
+                  points_size=2,
+                  point_color=(0.5, 0.5, 0.5),
+                  bbox_color=(0, 1, 0),
+                  points_in_box_color=(1, 0, 0),
+                  rot_axis=2,
+                  center_mode='lidar_bottom',
+                  mode='xyz'):
+    mesh_frame = geometry.TriangleMesh.create_coordinate_frame(
+        size=1.5, origin=[0, 0, 0])  # create coordinate frame
+    vis.add_geometry(mesh_frame)
+    # draw points
+    pcd, points_colors = _draw_points(points, vis, points_size, point_color,
+                                      mode)
+    # draw boxes
+    if bbox3d is not None:
+        _draw_bboxes(bbox3d, vis, points_colors, pcd, bbox_color,
+                     points_in_box_color, rot_axis, center_mode, mode)
+
+
 def _draw_bboxes_ind(bbox3d,
                      vis,
                      indices,

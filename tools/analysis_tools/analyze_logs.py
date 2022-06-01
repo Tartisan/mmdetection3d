@@ -176,7 +176,7 @@ def load_json_logs(json_logs):
             for line in log_file:
                 log = json.loads(line.strip())
                 # skip lines without `epoch` field
-                if 'epoch' not in log:
+                if 'epoch' not in log or 'mmdet3d_version' in log:
                     continue
                 epoch = log.pop('epoch')
                 if epoch not in log_dict:
