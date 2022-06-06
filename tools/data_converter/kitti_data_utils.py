@@ -350,7 +350,7 @@ def get_aicv_image_info(path,
 
         if annotations is not None:
             info['annos'] = annotations
-            add_difficulty_to_annos(info)
+            add_difficulty_to_annos(info) # all [-1]
 
         return info
 

@@ -3,13 +3,14 @@ import copy
 import os
 import tempfile
 from os import path as osp
+from copy import deepcopy
 
 import mmcv
 import numpy as np
 import torch
 from mmcv.utils import print_log
 
-from mmdet.datasets import DATASETS
+from .builder import DATASETS
 from ..core import show_multi_modality_result, show_result
 from ..core.bbox import (Box3DMode, CameraInstance3DBoxes, Coord3DMode,
                          LiDARInstance3DBoxes, points_cam2img)
@@ -156,17 +157,10 @@ class AicvDataset(Custom3DDataset):
         annos = info['annos']
         # we need other objects to avoid collision when sample
         annos = self.remove_dontcare(annos)
+        loc = annos['location']
+        dims = annos['dimensions']
+        rots = annos['rotation_y']
         gt_names = annos['name']
-        # [l, h, w] to [l, w, h]
-        dims = annos['dimensions'][:, [0, 2, 1]]
-        # camera coord to lidar coord
-        loc = (annos['location'] * [-1, -1, 1])[:, [2, 0, 1]]
-        loc[:, 2] = loc[:, 2] + dims[:, 2]
-        # rotation_y in camera coord to roation_z in lidar coord
-        rots = -annos['rotation_y'] - np.pi / 2
-        exceed_indx = np.where(rots < -np.pi)
-        rots[exceed_indx] = rots[exceed_indx] + 2 * np.pi
-
         gt_bboxes_3d = np.concatenate([loc, dims, rots[..., np.newaxis]],
                                       axis=1).astype(np.float32)
         gt_bboxes_3d = LiDARInstance3DBoxes(gt_bboxes_3d)
@@ -267,11 +261,7 @@ class AicvDataset(Custom3DDataset):
         else:
             tmp_dir = None
 
-        if not isinstance(outputs[0], dict):
-            result_files = self.bbox2result_kitti2d(outputs, self.CLASSES,
-                                                    pklfile_prefix,
-                                                    submission_prefix)
-        elif 'pts_bbox' in outputs[0] or 'img_bbox' in outputs[0]:
+        if 'pts_bbox' in outputs[0] or 'img_bbox' in outputs[0]:
             result_files = dict()
             for name in outputs[0]:
                 results_ = [out[name] for out in outputs]
@@ -280,20 +270,37 @@ class AicvDataset(Custom3DDataset):
                     submission_prefix_ = submission_prefix + name
                 else:
                     submission_prefix_ = None
-                if 'img' in name:
-                    result_files = self.bbox2result_kitti2d(
-                        results_, self.CLASSES, pklfile_prefix_,
-                        submission_prefix_)
-                else:
-                    result_files_ = self.bbox2result_kitti(
-                        results_, self.CLASSES, pklfile_prefix_,
-                        submission_prefix_)
+
+                result_files_ = self.bbox2result_kitti(
+                    results_, self.CLASSES, pklfile_prefix_,
+                    submission_prefix_)
                 result_files[name] = result_files_
         else:
             result_files = self.bbox2result_kitti(outputs, self.CLASSES,
                                                   pklfile_prefix,
                                                   submission_prefix)
         return result_files, tmp_dir
+
+    def format_gt_annos(self):
+        """
+        dimensions: l, w, h -> l, h, w
+        location:   x, y, z -> -y, -(z-h/2), x
+        rotation_y: r       -> -r - pi/2
+        """
+        gt_annos = []
+        for info in self.data_infos:
+            anno = deepcopy(info['annos'])
+            anno['location'][:, 2] -= anno['dimensions'][:, 2] / 2
+            anno['location'] = (anno['location'] * [1, -1, -1])[:, [1, 2, 0]]
+
+            anno['dimensions'] = anno['dimensions'][:, [0, 2, 1]]
+
+            anno['rotation_y'] = -anno['rotation_y'] - np.pi / 2
+            exceed_indx = np.where(anno['rotation_y'] < -np.pi)
+            anno['rotation_y'][exceed_indx] = anno['rotation_y'][exceed_indx] + 2 * np.pi
+            
+            gt_annos.append(anno)
+        return gt_annos
 
     def evaluate(self,
                  results,
@@ -330,7 +337,7 @@ class AicvDataset(Custom3DDataset):
         """
         result_files, tmp_dir = self.format_results(results, pklfile_prefix)
         from mmdet3d.core.evaluation import aicv_eval
-        gt_annos = [info['annos'] for info in self.data_infos]
+        gt_annos = self.format_gt_annos()
 
         if isinstance(result_files, dict):
             ap_dict = dict()
@@ -482,118 +489,6 @@ class AicvDataset(Custom3DDataset):
                 out = f'{pklfile_prefix}.pkl'
             mmcv.dump(det_annos, out)
             print(f'Result is saved to {out}.')
-
-        return det_annos
-
-    def bbox2result_kitti2d(self,
-                            net_outputs,
-                            class_names,
-                            pklfile_prefix=None,
-                            submission_prefix=None):
-        """Convert 2D detection results to kitti format for evaluation and test
-        submission.
-
-        Args:
-            net_outputs (list[np.ndarray]): List of array storing the
-                inferenced bounding boxes and scores.
-            class_names (list[String]): A list of class names.
-            pklfile_prefix (str): The prefix of pkl file.
-            submission_prefix (str): The prefix of submission file.
-
-        Returns:
-            list[dict]: A list of dictionaries have the kitti format
-        """
-        assert len(net_outputs) == len(self.data_infos), \
-            'invalid list length of network outputs'
-        det_annos = []
-        print('\nConverting prediction to AICV format')
-        for i, bboxes_per_sample in enumerate(
-                mmcv.track_iter_progress(net_outputs)):
-            annos = []
-            anno = dict(
-                name=[],
-                truncated=[],
-                occluded=[],
-                alpha=[],
-                bbox=[],
-                dimensions=[],
-                location=[],
-                rotation_y=[],
-                score=[])
-            sample_idx = self.data_infos[i]['image']['image_idx']
-
-            num_example = 0
-            for label in range(len(bboxes_per_sample)):
-                bbox = bboxes_per_sample[label]
-                for i in range(bbox.shape[0]):
-                    anno['name'].append(class_names[int(label)])
-                    anno['truncated'].append(0.0)
-                    anno['occluded'].append(0)
-                    anno['alpha'].append(0.0)
-                    anno['bbox'].append(bbox[i, :4])
-                    # set dimensions (height, width, length) to zero
-                    anno['dimensions'].append(
-                        np.zeros(shape=[3], dtype=np.float32))
-                    # set the 3D translation to (-1000, -1000, -1000)
-                    anno['location'].append(
-                        np.ones(shape=[3], dtype=np.float32) * (-1000.0))
-                    anno['rotation_y'].append(0.0)
-                    anno['score'].append(bbox[i, 4])
-                    num_example += 1
-
-            if num_example == 0:
-                annos.append(
-                    dict(
-                        name=np.array([]),
-                        truncated=np.array([]),
-                        occluded=np.array([]),
-                        alpha=np.array([]),
-                        bbox=np.zeros([0, 4]),
-                        dimensions=np.zeros([0, 3]),
-                        location=np.zeros([0, 3]),
-                        rotation_y=np.array([]),
-                        score=np.array([]),
-                    ))
-            else:
-                anno = {k: np.stack(v) for k, v in anno.items()}
-                annos.append(anno)
-
-            annos[-1]['sample_idx'] = np.array(
-                [sample_idx] * num_example, dtype=np.int64)
-            det_annos += annos
-
-        if pklfile_prefix is not None:
-            # save file in pkl format
-            pklfile_path = (
-                pklfile_prefix[:-4] if pklfile_prefix.endswith(
-                    ('.pkl', '.pickle')) else pklfile_prefix)
-            mmcv.dump(det_annos, pklfile_path)
-
-        if submission_prefix is not None:
-            # save file in submission format
-            mmcv.mkdir_or_exist(submission_prefix)
-            print(f'Saving AICV submission to {submission_prefix}')
-            for i, anno in enumerate(det_annos):
-                sample_idx = self.data_infos[i]['image']['image_idx']
-                cur_det_file = f'{submission_prefix}/{sample_idx:06d}.txt'
-                with open(cur_det_file, 'w') as f:
-                    bbox = anno['bbox']
-                    loc = anno['location']
-                    dims = anno['dimensions'][::-1]  # lhw -> hwl
-                    for idx in range(len(bbox)):
-                        print(
-                            '{} -1 -1 {:4f} {:4f} {:4f} {:4f} {:4f} {:4f} '
-                            '{:4f} {:4f} {:4f} {:4f} {:4f} {:4f} {:4f}'.format(
-                                anno['name'][idx],
-                                anno['alpha'][idx],
-                                *bbox[idx],  # 4 float
-                                *dims[idx],  # 3 float
-                                *loc[idx],  # 3 float
-                                anno['rotation_y'][idx],
-                                anno['score'][idx]),
-                            file=f,
-                        )
-            print(f'Result is saved to {submission_prefix}')
 
         return det_annos
 

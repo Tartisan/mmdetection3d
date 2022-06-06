@@ -217,19 +217,21 @@ def aicv_data_prep(root_path,
     converter = aicv.AICV2KITTI(
         root_path,
         save_dir,
-        test_mode=False)
+        test_mode=False, 
+        workers=workers)
     converter.convert()
     # Generate aicv infos
     out_dir = osp.join(out_dir, 'kitti_format')
-    kitti.create_aicv_info_file(
+    aicv.create_aicv_info_file(
         out_dir, info_prefix, max_sweeps=max_sweeps, workers=workers)
-    create_groundtruth_database(
+    GTDatabaseCreater(
         'AicvDataset',
         out_dir,
         info_prefix,
         f'{out_dir}/{info_prefix}_infos_train.pkl',
         relative_path=False,
-        with_mask=False)
+        with_mask=False,
+        num_worker=workers).create()
 
 
 parser = argparse.ArgumentParser(description='Data converter arg parser')

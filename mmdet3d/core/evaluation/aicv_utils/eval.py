@@ -81,7 +81,7 @@ def aicv_eval(gt_annos,
             pred_alpha = True
             break
     for anno in gt_annos:
-        if anno['alpha'][0] != -10:
+        if anno['alpha'].size != 0 and anno['alpha'][0] != -10:
             valid_alpha_gt = True
             break
     compute_aos = (pred_alpha and valid_alpha_gt)
