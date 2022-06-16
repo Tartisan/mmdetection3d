@@ -9,6 +9,15 @@ from .image_vis import (draw_camera_bbox3d_on_img, draw_depth_bbox3d_on_img,
                         draw_lidar_bbox3d_on_img)
 
 
+# http://www1.ynao.ac.cn/~jinhuahe/know_base/othertopics/computerissues/RGB_colortable.htm
+palette = [[0, 255, 0],     # 绿色
+           [0, 255, 255],   # 青色
+           [255, 153, 18],  # 镉黄
+           [255, 0, 255],   # 深红
+           [3, 138, 158],   # 锰蓝
+           [160, 32, 240],  # 紫色
+           [255, 255, 255]] # 黑色
+
 def _write_obj(points, out_filename):
     """Write points into ``obj`` format for meshlab visualization.
 
@@ -106,19 +115,18 @@ def show_result(points,
             if pred_labels is None:
                 vis.add_bboxes(bbox3d=pred_bboxes)
             else:
-                palette = np.random.randint(
-                    0, 255, size=(pred_labels.max() + 1, 3)) / 256
+                # palette = np.random.randint(
+                #     0, 255, size=(pred_labels.max() + 1, 3)) / 256
                 labelDict = {}
                 for j in range(len(pred_labels)):
-                    i = int(pred_labels[j].numpy())
+                    i = int(pred_labels[j])
                     if labelDict.get(i) is None:
                         labelDict[i] = []
                     labelDict[i].append(pred_bboxes[j])
                 for i in labelDict:
                     vis.add_bboxes(
                         bbox3d=np.array(labelDict[i]),
-                        bbox_color=palette[i],
-                        points_in_box_color=palette[i])
+                        bbox_color=[c / 255.0 for c in palette[i]])
 
         if gt_bboxes is not None:
             vis.add_bboxes(bbox3d=gt_bboxes, bbox_color=(0, 0, 1))

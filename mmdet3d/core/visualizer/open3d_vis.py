@@ -86,6 +86,7 @@ def _draw_bboxes(bbox3d,
         mode (str, optional):  indicate type of the input points,
             available mode ['xyz', 'xyzrgb']. Default: 'xyz'.
     """
+    # vis.get_render_option().line_width = 2.0
     if isinstance(bbox3d, torch.Tensor):
         bbox3d = bbox3d.cpu().numpy()
     bbox3d = bbox3d.copy()
@@ -107,9 +108,22 @@ def _draw_bboxes(bbox3d,
         box3d = geometry.OrientedBoundingBox(center, rot_mat, dim)
 
         line_set = geometry.LineSet.create_from_oriented_bounding_box(box3d)
+        # add direction
+        line_set.lines.append([1, 4])
+        line_set.lines.append([6, 7])
         line_set.paint_uniform_color(bbox_color)
         # draw bboxes on visualizer
         vis.add_geometry(line_set)
+
+        # add arrow-like line
+        offset = [dim[0] / 2.0 * np.cos(yaw[rot_axis]), 
+                  dim[0] / 2.0 * np.sin(yaw[rot_axis]), 
+                  0.0]
+        arrow_set = geometry.LineSet()
+        arrow_set.points = o3d.utility.Vector3dVector([center, center + offset])
+        arrow_set.lines = o3d.utility.Vector2iVector([[0, 1]])
+        arrow_set.paint_uniform_color(bbox_color)
+        vis.add_geometry(arrow_set)
 
         # change the color of points which are in box
         if pcd is not None and mode == 'xyz':
@@ -480,3 +494,12 @@ class Visualizer(object):
 
         self.o3d_visualizer.destroy_window()
         return
+
+    def add_points(self, points=None):
+        mesh_frame = geometry.TriangleMesh.create_coordinate_frame(
+            size=1, origin=[0, 0, 0])  # create coordinate frame
+        self.o3d_visualizer.add_geometry(mesh_frame)
+        if points is not None:
+            self.pcd, self.points_colors = _draw_points(
+                points, self.o3d_visualizer, self.points_size, self.point_color, 
+                self.mode)

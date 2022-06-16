@@ -2,19 +2,66 @@
 import os
 import os.path as osp
 from pathlib import Path
-
+from concurrent import futures as futures
+import random
 import mmcv
 import json
 import numpy as np
 from tqdm import tqdm
 from tools.visualizer import pypcd
 from mmdet3d.core.bbox import box_np_ops
-from .kitti_data_utils import get_aicv_image_info
+from .kitti_data_utils import (get_velodyne_path, get_label_path, 
+                               get_label_anno, add_difficulty_to_annos)
+from .kitti_converter import _NumPointsInGTCalculater
+
+
+def argsort(seq):
+    return sorted(range(len(seq)), key=seq.__getitem__)
 
 def _read_file(path):
     with open(path, 'r') as f:
         lines = f.readlines()
     return [line for line in lines]
+
+def _read_result(path):
+    relative_paths = []
+    label_infos = []
+    with open(path, 'r') as f:
+        lines = f.readlines()
+        for line in lines[1:]:
+            infos = json.loads(line.split('\t')[1])
+            if 'labelData' not in infos.keys():
+                continue
+            relative_paths.append(infos['datasetsRelatedFiles'][0]['localRelativePath'])
+            label_infos.append(infos)
+
+    sorted_index = argsort(relative_paths)
+    return [label_infos[i] for i in sorted_index]
+
+
+def _split_imageset(imageset_dir, frame_num):
+    trainval_idx = [*range(frame_num)]
+    mmcv.mkdir_or_exist(imageset_dir)
+    _write_imageset_file(osp.join(imageset_dir, 'trainval.txt'), trainval_idx)
+
+    random.shuffle(trainval_idx)
+    total = len(trainval_idx)
+    split_ratio = 0.8
+    split = (int)(total * split_ratio)
+    print('{} splits {} to train, {} to val'.format(total, split, total-split))
+
+    train_idx = trainval_idx[0: split]
+    val_idx = trainval_idx[split: total]
+    _write_imageset_file(osp.join(imageset_dir, 'train.txt'), train_idx)
+    _write_imageset_file(osp.join(imageset_dir, 'val.txt'), val_idx)
+
+
+def _write_imageset_file(path, split_idx):
+    split_idx.sort()
+    with open(path, 'w+') as f:
+        for idx in split_idx:
+            f.write(str(idx) + '\n')
+
 
 def _read_imageset_file(path):
     with open(path, 'r') as f:
@@ -77,14 +124,17 @@ class AICV2KITTI(object):
             'fog': 'DontCare',
             'others': 'DontCare'
         }
-        self.selected_kitti_classes = ['Car', 'Cyclist', 'Pedestrian', 'Sign']
+        self.selected_kitti_classes = ['Car', 'Cyclist', 'Pedestrian']
         
         self.load_dir = load_dir
         self.save_dir = save_dir
         self.test_mode = test_mode
         self.workers = int(workers)
 
-        self.result_pathnames = _read_file(load_dir + f'/result.txt')[1:]
+        self.label_infos = _read_result(load_dir + f'/result.txt')
+
+        self.imageset_dir = f'{self.load_dir}/kitti_format/ImageSets'
+        _split_imageset(self.imageset_dir, len(self))
 
         self.label_save_dir = f'{self.save_dir}/label'
         self.point_cloud_save_dir = f'{self.save_dir}/velodyne'
@@ -97,14 +147,14 @@ class AICV2KITTI(object):
         """Convert action."""
         print('Start converting ...')
         for frame_idx in tqdm(range(len(self))):
-            infos = json.loads(self.result_pathnames[frame_idx].split('\t')[1])
+            infos = self.label_infos[frame_idx]
             pcd_pathname = osp.join(
                 self.load_dir, 
                 infos['datasetsRelatedFiles'][0]['localRelativePath'], 
                 infos['datasetsRelatedFiles'][0]['fileName'])
             annotations = infos['labelData']['result']
-            poses = infos['poses']['velodyne_points'].split(' ')
-            pose = [float(val) for val in poses[2:5]]
+            # frame_id timestamp x y z qx qy qz qw
+            pose = infos['poses']['velodyne_points']
             timestamp = infos['frameTimestamp']
 
             self.save_lidar(pcd_pathname, frame_idx)
@@ -121,14 +171,14 @@ class AICV2KITTI(object):
     #     print('\nFinished ...')
 
     def convert_one(self, frame_idx):
-        infos = json.loads(self.result_pathnames[frame_idx].split('\t')[1])
+        infos = self.label_infos[frame_idx]
         pcd_pathname = osp.join(
             self.load_dir, 
             infos['datasetsRelatedFiles'][0]['localRelativePath'], 
             infos['datasetsRelatedFiles'][0]['fileName'])
         annotations = infos['labelData']['result']
-        poses = infos['poses']['velodyne_points'].split(' ')
-        pose = [float(val) for val in poses[2:5]]
+        # frame_id timestamp x y z qx qy qz qw
+        pose = infos['poses']['velodyne_points']
         timestamp = infos['frameTimestamp']
 
         self.save_lidar(pcd_pathname, frame_idx)
@@ -138,15 +188,15 @@ class AICV2KITTI(object):
 
     def __len__(self):
         """Length of the filename list."""
-        return len(self.result_pathnames)
+        return len(self.label_infos)
 
     def save_lidar(self, pcd_pathname, frame_idx):
         point_cloud_path = f'{self.point_cloud_save_dir}/{str(frame_idx).zfill(6)}.bin'
 
         pcd = pypcd.PointCloud.from_path(pcd_pathname)
-        point_cloud = np.stack([pcd.pc_data['x'], pcd.pc_data['y'], 
-                                pcd.pc_data['z'], pcd.pc_data['intensity']]).transpose(1, 0)
-        point_cloud.astype(np.float32).tofile(point_cloud_path)
+        points = np.stack([pcd.pc_data['x'], pcd.pc_data['y'], pcd.pc_data['z'], 
+                           pcd.pc_data['intensity'], pcd.pc_data['timestamp']]).transpose(1, 0)
+        points.astype(np.float32).tofile(point_cloud_path)
 
     def save_label(self, annotations, frame_idx):
         """Parse and save the label data in txt format.
@@ -218,9 +268,8 @@ class AICV2KITTI(object):
             f.write(str(timestamp))
 
     def save_pose(self, pose, frame_idx):
-        np.savetxt(
-            osp.join(f'{self.pose_save_dir}/{str(frame_idx).zfill(6)}.txt'),
-            np.array(pose))
+        with open(osp.join(f'{self.pose_save_dir}/{str(frame_idx).zfill(6)}.txt'), 'w') as f:
+            f.write(pose)
 
     def create_folder(self):
         """Create folder for data preprocessing."""
@@ -233,6 +282,46 @@ class AICV2KITTI(object):
         for d in dir_list:
             mmcv.mkdir_or_exist(d)
 
+
+def get_aicv_image_info(path,
+                        training=True,
+                        label_info=True,
+                        velodyne=False,
+                        image_ids=7481,
+                        num_worker=8,
+                        relative_path=True):
+    root_path = Path(path)
+    if not isinstance(image_ids, list):
+        image_ids = list(range(image_ids))
+
+    def map_func(idx):
+        info = {}
+        pc_info = {'num_features': 4}
+        image_info = {'image_idx': idx}
+
+        annotations = None
+        if velodyne:
+            pc_info['velodyne_path'] = get_velodyne_path(
+                idx, path, training, relative_path)
+        if label_info:
+            label_path = get_label_path(idx, path, training, relative_path, 
+                                        info_type='label')
+            if relative_path:
+                label_path = str(root_path / label_path)
+            annotations = get_label_anno(label_path)
+        info['point_cloud'] = pc_info
+        info['image'] = image_info
+
+        if annotations is not None:
+            info['annos'] = annotations
+            add_difficulty_to_annos(info) # all [-1]
+
+        return info
+
+    with futures.ThreadPoolExecutor(num_worker) as executor:
+        image_infos = executor.map(map_func, image_ids)
+
+    return list(image_infos)
 
 def _calculate_num_points_in_gt(data_path,
                                       infos,
@@ -263,11 +352,12 @@ def _calculate_num_points_in_gt(data_path,
             [num_points_in_gt, -np.ones([num_ignored])])
         annos['num_points_in_gt'] = num_points_in_gt.astype(np.int32)
 
+
 def create_aicv_info_file(data_path,
                           pkl_prefix='aicv',
                           save_path=None,
                           relative_path=True,
-                          max_sweeps=5,
+                          max_sweeps=0,
                           workers=8):
     """Create info file of aicv dataset.
 
@@ -293,27 +383,104 @@ def create_aicv_info_file(data_path,
         save_path = Path(data_path)
     else:
         save_path = Path(save_path)
-    aicv_infos_train = get_aicv_image_info(
+
+    aicv_infos_gatherer = AicvInfoGatherer(
         data_path,
         training=True,
         velodyne=True,
-        image_ids=train_img_ids,
-        relative_path=relative_path)
-    _calculate_num_points_in_gt(data_path, aicv_infos_train, relative_path)
+        relative_path=relative_path,
+        num_worker=workers)
+    num_points_in_gt_calculater = _NumPointsInGTCalculater(
+        data_path,
+        relative_path,
+        calib=False,
+        num_features=5,
+        remove_outside=False,
+        num_worker=workers)
+
+    aicv_infos_train = aicv_infos_gatherer.gather(train_img_ids)
+    num_points_in_gt_calculater.calculate(aicv_infos_train)
     filename = save_path / f'{pkl_prefix}_infos_train.pkl'
-    print(f'Aicv info train file is saved to {filename}')
+    print(f'Waymo info train file is saved to {filename}')
     mmcv.dump(aicv_infos_train, filename)
-    
-    aicv_infos_val = get_aicv_image_info(
-        data_path,
-        training=True,
-        velodyne=True,
-        image_ids=val_img_ids,
-        relative_path=relative_path)
-    _calculate_num_points_in_gt(data_path, aicv_infos_val, relative_path)
+    aicv_infos_val = aicv_infos_gatherer.gather(val_img_ids)
+    num_points_in_gt_calculater.calculate(aicv_infos_val)
     filename = save_path / f'{pkl_prefix}_infos_val.pkl'
-    print(f'Aicv info val file is saved to {filename}')
+    print(f'Waymo info val file is saved to {filename}')
     mmcv.dump(aicv_infos_val, filename)
     filename = save_path / f'{pkl_prefix}_infos_trainval.pkl'
-    print(f'Aicv info trainval file is saved to {filename}')
+    print(f'Waymo info trainval file is saved to {filename}')
     mmcv.dump(aicv_infos_train + aicv_infos_val, filename)
+
+
+class AicvInfoGatherer:
+    """
+    Parallel version of AICV dataset information gathering.
+    AICV annotation format version like KITTI:
+    {
+        [optional]points: [N, 3+] point cloud
+        [optional, for kitti]image: {
+            image_idx: ...
+        }
+        point_cloud: {
+            num_features: 5
+            velodyne_path: ...
+        }
+        annos: {
+            location: [num_gt, 3] array
+            dimensions: [num_gt, 3] array
+            rotation_y: [num_gt] angle array
+            name: [num_gt] ground truth name array
+            [optional]difficulty: kitti difficulty
+            [optional]group_ids: used for multi-part object
+        }
+    }
+    """
+
+    def __init__(self,
+                 path,
+                 training=True,
+                 label_info=True,
+                 velodyne=True,
+                 pose=False,
+                 relative_path=True,
+                 num_worker=8) -> None:
+        self.path = path
+        self.training = training
+        self.label_info = label_info
+        self.velodyne = velodyne
+        self.pose = pose
+        self.relative_path = relative_path
+        self.num_worker = num_worker
+
+    def gather_single(self, idx):
+        root_path = Path(self.path)
+        info = {}
+        pc_info = {'num_features': 4}
+        image_info = {'image_idx': idx}
+
+        annotations = None
+        if self.velodyne:
+            pc_info['velodyne_path'] = get_velodyne_path(
+                idx, self.path, self.training, self.relative_path)
+        if self.label_info:
+            label_path = get_label_path(idx, self.path, self.training, 
+                                        self.relative_path, info_type='label')
+            if self.relative_path:
+                label_path = str(root_path / label_path)
+            annotations = get_label_anno(label_path)
+        info['point_cloud'] = pc_info
+        info['image'] = image_info
+
+        if annotations is not None:
+            info['annos'] = annotations
+            add_difficulty_to_annos(info) # all [-1]
+
+        return info
+
+    def gather(self, image_ids):
+        if not isinstance(image_ids, list):
+            image_ids = list(range(image_ids))
+        image_infos = mmcv.track_parallel_progress(self.gather_single,
+                                                   image_ids, self.num_worker)
+        return list(image_infos)

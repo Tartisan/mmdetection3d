@@ -7,7 +7,7 @@ import numpy as np
 from nuscenes.utils.geometry_utils import view_points
 
 from mmdet3d.core.bbox import box_np_ops, points_cam2img
-from .kitti_data_utils import WaymoInfoGatherer, get_kitti_image_info, get_aicv_image_info
+from .kitti_data_utils import WaymoInfoGatherer, get_kitti_image_info
 from .nuscenes_converter import post_process_coords
 
 kitti_categories = ('Pedestrian', 'Cyclist', 'Car')
@@ -63,11 +63,13 @@ class _NumPointsInGTCalculater:
     def __init__(self,
                  data_path,
                  relative_path,
+                 calib=True,
                  remove_outside=True,
                  num_features=4,
                  num_worker=8) -> None:
         self.data_path = data_path
         self.relative_path = relative_path
+        self.calib = calib
         self.remove_outside = remove_outside
         self.num_features = num_features
         self.num_worker = num_worker
@@ -75,7 +77,6 @@ class _NumPointsInGTCalculater:
     def calculate_single(self, info):
         pc_info = info['point_cloud']
         image_info = info['image']
-        calib = info['calib']
         if self.relative_path:
             v_path = str(Path(self.data_path) / pc_info['velodyne_path'])
         else:
@@ -83,21 +84,28 @@ class _NumPointsInGTCalculater:
         points_v = np.fromfile(
             v_path, dtype=np.float32,
             count=-1).reshape([-1, self.num_features])
-        rect = calib['R0_rect']
-        Trv2c = calib['Tr_velo_to_cam']
-        P2 = calib['P2']
-        if self.remove_outside:
-            points_v = box_np_ops.remove_outside_points(
-                points_v, rect, Trv2c, P2, image_info['image_shape'])
+        
+        if self.calib:
+            calib = info['calib']
+            rect = calib['R0_rect']
+            Trv2c = calib['Tr_velo_to_cam']
+            P2 = calib['P2']
+            if self.remove_outside:
+                points_v = box_np_ops.remove_outside_points(
+                    points_v, rect, Trv2c, P2, image_info['image_shape'])
         annos = info['annos']
         num_obj = len([n for n in annos['name'] if n != 'DontCare'])
         dims = annos['dimensions'][:num_obj]
         loc = annos['location'][:num_obj]
         rots = annos['rotation_y'][:num_obj]
-        gt_boxes_camera = np.concatenate([loc, dims, rots[..., np.newaxis]],
-                                         axis=1)
-        gt_boxes_lidar = box_np_ops.box_camera_to_lidar(
-            gt_boxes_camera, rect, Trv2c)
+        if self.calib:
+            gt_boxes_camera = np.concatenate([loc, dims, rots[..., np.newaxis]],
+                                            axis=1)
+            gt_boxes_lidar = box_np_ops.box_camera_to_lidar(
+                gt_boxes_camera, rect, Trv2c)
+        else:
+            gt_boxes_lidar = np.concatenate([loc, dims, rots[..., np.newaxis]],
+                                            axis=1)
         indices = box_np_ops.points_in_rbbox(points_v[:, :3], gt_boxes_lidar)
         num_points_in_gt = indices.sum(0)
         num_ignored = len(annos['dimensions']) - num_obj

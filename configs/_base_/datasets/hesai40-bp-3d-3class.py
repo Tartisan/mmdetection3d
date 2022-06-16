@@ -25,7 +25,7 @@ db_sampler = dict(
     points_loader=dict(
         type='LoadPointsFromFile',
         coord_type='LIDAR',
-        load_dim=4,
+        load_dim=5,
         use_dim=[0, 1, 2, 3],
         file_client_args=file_client_args))
 
@@ -33,7 +33,7 @@ train_pipeline = [
     dict(
         type='LoadPointsFromFile',
         coord_type='LIDAR',
-        load_dim=4,
+        load_dim=5,
         use_dim=4,
         file_client_args=file_client_args),
     dict(
@@ -61,7 +61,7 @@ test_pipeline = [
     dict(
         type='LoadPointsFromFile',
         coord_type='LIDAR',
-        load_dim=4,
+        load_dim=5,
         use_dim=4,
         file_client_args=file_client_args),
     dict(
@@ -91,7 +91,7 @@ eval_pipeline = [
     dict(
         type='LoadPointsFromFile',
         coord_type='LIDAR',
-        load_dim=4,
+        load_dim=5,
         use_dim=4,
         file_client_args=file_client_args),
     dict(
@@ -102,7 +102,7 @@ eval_pipeline = [
 ]
 
 data = dict(
-    samples_per_gpu=8,
+    samples_per_gpu=4,
     workers_per_gpu=4,
     train=dict(
         type='RepeatDataset',

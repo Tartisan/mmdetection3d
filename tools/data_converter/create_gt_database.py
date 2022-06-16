@@ -231,7 +231,7 @@ def create_groundtruth_database(dataset_class_name,
                 dict(
                     type='LoadPointsFromFile',
                     coord_type='LIDAR',
-                    load_dim=4,
+                    load_dim=5,
                     use_dim=4,
                     file_client_args=file_client_args),
                 dict(
@@ -617,7 +617,7 @@ class GTDatabaseCreater:
                     dict(
                         type='LoadPointsFromFile',
                         coord_type='LIDAR',
-                        load_dim=4,
+                        load_dim=5,
                         use_dim=4,
                         file_client_args=file_client_args),
                     dict(

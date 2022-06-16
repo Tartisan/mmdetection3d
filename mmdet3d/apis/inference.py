@@ -328,6 +328,7 @@ def inference_segmentor(model, pcd):
 def show_det_result_meshlab(data,
                             result,
                             out_dir,
+                            gt=None, 
                             score_thr=0.0,
                             show=False,
                             snapshot=False):
@@ -339,14 +340,17 @@ def show_det_result_meshlab(data,
     if 'pts_bbox' in result[0].keys():
         pred_bboxes = result[0]['pts_bbox']['boxes_3d'].tensor.numpy()
         pred_scores = result[0]['pts_bbox']['scores_3d'].numpy()
+        pred_labels = result[0]['pts_bbox']['labels_3d'].numpy()
     else:
         pred_bboxes = result[0]['boxes_3d'].tensor.numpy()
         pred_scores = result[0]['scores_3d'].numpy()
+        pred_labels = result[0]['labels_3d'].numpy()
 
     # filter out low score bboxes for visualization
     if score_thr > 0:
         inds = pred_scores > score_thr
         pred_bboxes = pred_bboxes[inds]
+        pred_labels = pred_labels[inds]
 
     # for now we convert points into depth mode
     box_mode = data['img_metas'][0][0]['box_mode_3d']
@@ -356,14 +360,19 @@ def show_det_result_meshlab(data,
     else:
         show_bboxes = deepcopy(pred_bboxes)
 
+    gt_bboxes = None
+    if gt is not None:
+        gt_bboxes = Box3DMode.convert(gt, box_mode, Box3DMode.DEPTH)
+
     show_result(
         points,
-        None,
+        gt_bboxes,
         show_bboxes,
         out_dir,
         file_name,
         show=show,
-        snapshot=snapshot)
+        snapshot=snapshot, 
+        pred_labels=pred_labels)
 
     return file_name
 
@@ -484,6 +493,7 @@ def show_proj_det_result_meshlab(data,
 def show_result_meshlab(data,
                         result,
                         out_dir,
+                        gt=None, 
                         score_thr=0.0,
                         show=False,
                         snapshot=False,
@@ -512,7 +522,7 @@ def show_result_meshlab(data,
     assert out_dir is not None, 'Expect out_dir, got none.'
 
     if task in ['det', 'multi_modality-det']:
-        file_name = show_det_result_meshlab(data, result, out_dir, score_thr,
+        file_name = show_det_result_meshlab(data, result, out_dir, gt, score_thr,
                                             show, snapshot)
 
     if task in ['seg']:

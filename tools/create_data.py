@@ -199,7 +199,7 @@ def aicv_data_prep(root_path,
                    version,
                    out_dir,
                    workers,
-                   max_sweeps=1):
+                   max_sweeps=0):
     """Prepare the info file for waymo dataset.
 
     Args:
