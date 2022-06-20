@@ -278,6 +278,8 @@ def compute_statistics_jit(overlaps,
                 similarity = np.sum(tmp)
             else:
                 similarity = -1
+    # print('tp:', tp, 'fp:', fp, 'fn:', fn, 'similarity:', similarity, 
+    #       'thresholds:', thresholds[:thresh_idx])
     return tp, fp, fn, similarity, thresholds[:thresh_idx]
 
 
@@ -305,6 +307,7 @@ def fused_compute_statistics(overlaps,
                              min_overlap,
                              thresholds,
                              compute_aos=False):
+    # print('fused_compute_statistics')
     gt_num = 0
     dt_num = 0
     dc_num = 0
@@ -491,6 +494,7 @@ def eval_class(gt_annos,
     aos = np.zeros([num_class, num_difficulty, num_minoverlap, N_SAMPLE_PTS])
     for m, current_class in enumerate(current_classes):
         for idx_l, difficulty in enumerate(difficultys):
+            # print('current_class:', current_class, 'difficulty:', difficulty)
             rets = _prepare_data(gt_annos, dt_annos, current_class, difficulty)
             (gt_datas_list, dt_datas_list, ignored_gts, ignored_dets,
              dontcares, total_dc_num, total_num_valid_gt) = rets

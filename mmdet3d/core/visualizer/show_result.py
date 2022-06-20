@@ -10,13 +10,33 @@ from .image_vis import (draw_camera_bbox3d_on_img, draw_depth_bbox3d_on_img,
 
 
 # http://www1.ynao.ac.cn/~jinhuahe/know_base/othertopics/computerissues/RGB_colortable.htm
-palette = [[0, 255, 0],     # 绿色
+PALETTE = [[0, 255, 0],     # 绿色
            [0, 255, 255],   # 青色
            [255, 153, 18],  # 镉黄
            [255, 0, 255],   # 深红
            [3, 138, 158],   # 锰蓝
            [160, 32, 240],  # 紫色
-           [255, 255, 255]] # 黑色
+           [255, 255, 255], # 黑色
+           [255, 97, 0],    # 橙色
+           [255, 192, 203], # 粉红
+           [255, 187, 120],
+           [188, 189, 34],
+           [140, 86, 75],
+           [255, 152, 150],
+           [214, 39, 40],
+           [197, 176, 213],
+           [148, 103, 189],
+           [196, 156, 148],
+           [23, 190, 207],
+           [247, 182, 210],
+           [219, 219, 141],
+           [255, 127, 14],
+           [158, 218, 229],
+           [44, 160, 44],
+           [112, 128, 144],
+           [227, 119, 194],
+           [82, 84, 163]]
+
 
 def _write_obj(points, out_filename):
     """Write points into ``obj`` format for meshlab visualization.
@@ -126,7 +146,7 @@ def show_result(points,
                 for i in labelDict:
                     vis.add_bboxes(
                         bbox3d=np.array(labelDict[i]),
-                        bbox_color=[c / 255.0 for c in palette[i]])
+                        bbox_color=[c / 255.0 for c in PALETTE[i]])
 
         if gt_bboxes is not None:
             vis.add_bboxes(bbox3d=gt_bboxes, bbox_color=(0, 0, 1))
@@ -140,14 +160,12 @@ def show_result(points,
     if gt_bboxes is not None:
         # bottom center to gravity center
         gt_bboxes[..., 2] += gt_bboxes[..., 5] / 2
-
         _write_oriented_bbox(gt_bboxes,
                              osp.join(result_path, f'{filename}_gt.obj'))
 
     if pred_bboxes is not None:
         # bottom center to gravity center
         pred_bboxes[..., 2] += pred_bboxes[..., 5] / 2
-
         _write_oriented_bbox(pred_bboxes,
                              osp.join(result_path, f'{filename}_pred.obj'))
 

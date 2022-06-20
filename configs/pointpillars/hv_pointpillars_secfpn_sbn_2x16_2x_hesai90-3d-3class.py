@@ -1,6 +1,6 @@
 _base_ = [
     '../_base_/models/hv_pointpillars_secfpn_aicv.py',
-    '../_base_/datasets/hesai40-bp-3d-3class.py',
+    '../_base_/datasets/hesai90-3d-3class.py',
     '../_base_/schedules/schedule_2x.py',
     '../_base_/default_runtime.py',
 ]
@@ -24,5 +24,5 @@ model = dict(
         point_cloud_range=[-74.88, -74.88, -4, 74.88, 74.88, 2],
         norm_cfg=dict(type='naiveSyncBN1d', eps=1e-3, momentum=0.01)))
 
-runner = dict(max_epochs=120)
+runner = dict(max_epochs=60)
 evaluation = dict(interval=10)

@@ -7,7 +7,7 @@ import os.path as osp
 import open3d as o3d
 import mmcv
 from mmdet3d.apis import inference_detector, init_model
-from mmdet3d.core.visualizer.open3d_vis import Visualizer, add_pts_boxes
+from mmdet3d.core.visualizer.open3d_vis import Visualizer
 from tools.data_converter.kitti_data_utils import get_label_anno
 
 # http://www1.ynao.ac.cn/~jinhuahe/know_base/othertopics/computerissues/RGB_colortable.htm
@@ -70,7 +70,7 @@ def show_result_meshlab(vis,
     ctr.set_lookat([0,0,0])
     ctr.set_front([-1,-1,1])    # 设置垂直指向屏幕外的向量
     ctr.set_up([0,0,1])         # 设置指向屏幕上方的向量
-    ctr.set_zoom(0.1)
+    ctr.set_zoom(0.3)
 
     vis.o3d_visualizer.poll_events()
     vis.o3d_visualizer.update_renderer()

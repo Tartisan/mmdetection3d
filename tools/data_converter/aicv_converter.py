@@ -42,6 +42,10 @@ def _read_result(path):
 def _split_imageset(imageset_dir, frame_num):
     trainval_idx = [*range(frame_num)]
     mmcv.mkdir_or_exist(imageset_dir)
+    if osp.exists(osp.join(imageset_dir, 'trainval.txt')) and \
+       osp.exists(osp.join(imageset_dir, 'train.txt')) and \
+       osp.exists(osp.join(imageset_dir, 'val.txt')):
+       return
     _write_imageset_file(osp.join(imageset_dir, 'trainval.txt'), trainval_idx)
 
     random.shuffle(trainval_idx)
@@ -157,7 +161,7 @@ class AICV2KITTI(object):
             pose = infos['poses']['velodyne_points']
             timestamp = infos['frameTimestamp']
 
-            self.save_lidar(pcd_pathname, frame_idx)
+            self.save_lidar(pcd_pathname, frame_idx, timestamp)
             self.save_pose(pose, frame_idx)
             self.save_timestamp(timestamp, frame_idx)
             self.save_label(annotations, frame_idx)
@@ -181,7 +185,7 @@ class AICV2KITTI(object):
         pose = infos['poses']['velodyne_points']
         timestamp = infos['frameTimestamp']
 
-        self.save_lidar(pcd_pathname, frame_idx)
+        self.save_lidar(pcd_pathname, frame_idx, timestamp)
         self.save_pose(pose, frame_idx)
         self.save_timestamp(timestamp, frame_idx)
         self.save_label(annotations, frame_idx)
@@ -190,12 +194,16 @@ class AICV2KITTI(object):
         """Length of the filename list."""
         return len(self.label_infos)
 
-    def save_lidar(self, pcd_pathname, frame_idx):
+    def save_lidar(self, pcd_pathname, frame_idx, timestamp):
         point_cloud_path = f'{self.point_cloud_save_dir}/{str(frame_idx).zfill(6)}.bin'
 
         pcd = pypcd.PointCloud.from_path(pcd_pathname)
+        if 'timestamp' not in pcd.fields:
+            stamp = np.zeros_like(pcd.pc_data['x']) + float(timestamp)/1000.
+        else:
+            stamp = pcd.pc_data['timestamp']
         points = np.stack([pcd.pc_data['x'], pcd.pc_data['y'], pcd.pc_data['z'], 
-                           pcd.pc_data['intensity'], pcd.pc_data['timestamp']]).transpose(1, 0)
+                           pcd.pc_data['intensity'], stamp]).transpose(1, 0)
         points.astype(np.float32).tofile(point_cloud_path)
 
     def save_label(self, annotations, frame_idx):

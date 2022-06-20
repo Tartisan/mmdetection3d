@@ -377,3 +377,15 @@ def rotate_iou_gpu_eval(boxes, query_boxes, criterion=-1, device_id=0):
                                        iou_dev, criterion)
         iou_dev.copy_to_host(iou.reshape([-1]), stream=stream)
     return iou.astype(boxes.dtype)
+
+
+if __name__ == '__main__':
+    # camera coordinate system
+    #   [x, y, z, l, h, w, r]
+    gt_boxes = np.array([[6.96, 1.86, 14.62, 1.90, 1.78, 1.90, -1.57]])
+    dt_boxes = np.array([[6.96, 1.86, 14.62, 1.90, 1.78, 1.90, 0]])
+    # bev overlap
+    #   [x, z, l, w, r]
+    riou = rotate_iou_gpu_eval(gt_boxes[:, [0, 2, 3, 5, 6]], 
+                               dt_boxes[:, [0, 2, 3, 5, 6]], -1)
+    print('bev rotate_iou:', riou)

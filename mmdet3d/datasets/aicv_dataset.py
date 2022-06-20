@@ -16,6 +16,7 @@ from ..core.bbox import (Box3DMode, CameraInstance3DBoxes, Coord3DMode,
                          LiDARInstance3DBoxes, points_cam2img)
 from .custom_3d import Custom3DDataset
 from .pipelines import Compose
+from ..core.evaluation.kitti_utils.eval import eval_class, get_mAP40
 
 
 @DATASETS.register_module()
@@ -53,7 +54,7 @@ class AicvDataset(Custom3DDataset):
             filter invalid predicted boxes.
             Default: [-85, -85, -5, 85, 85, 5].
     """
-    CLASSES = ('Car', 'Cyclist', 'Pedestrain')
+    CLASSES = ('Car', 'Cyclist', 'Pedestrian')
 
     def __init__(self,
                  data_root,
@@ -284,23 +285,137 @@ class AicvDataset(Custom3DDataset):
     def format_gt_annos(self):
         """
         dimensions: l, w, h -> l, h, w
-        location:   x, y, z -> -y, -(z-h/2), x
+        location:   x, y, z -> -y, -z, x
         rotation_y: r       -> -r - pi/2
         """
         gt_annos = []
         for info in self.data_infos:
             anno = deepcopy(info['annos'])
-            anno['location'][:, 2] -= anno['dimensions'][:, 2] / 2
+            # check box_preds
+            valid_pcd_inds = ((anno['location'] > self.pcd_limit_range[:3]) &
+                              (anno['location'] < self.pcd_limit_range[3:]))
+            valid_inds = valid_pcd_inds.all(-1)
+            for k, v in anno.items():
+                anno[k] = anno[k][valid_inds]
+
             anno['location'] = (anno['location'] * [1, -1, -1])[:, [1, 2, 0]]
-
             anno['dimensions'] = anno['dimensions'][:, [0, 2, 1]]
-
             anno['rotation_y'] = -anno['rotation_y'] - np.pi / 2
             exceed_indx = np.where(anno['rotation_y'] < -np.pi)
             anno['rotation_y'][exceed_indx] = anno['rotation_y'][exceed_indx] + 2 * np.pi
             
             gt_annos.append(anno)
         return gt_annos
+
+    def do_eval(self, 
+                gt_annos,
+                dt_annos,
+                current_classes,
+                min_overlaps,
+                eval_types=['bev', '3d']):
+        # min_overlaps: [num_minoverlap, metric, num_class]
+        difficultys = [1]
+        mAP40_bev = None
+        if 'bev' in eval_types:
+            ret = eval_class(gt_annos, dt_annos, current_classes, difficultys, 1,
+                            min_overlaps)
+            mAP40_bev = get_mAP40(ret['precision'])
+
+        mAP40_3d = None
+        if '3d' in eval_types:
+            ret = eval_class(gt_annos, dt_annos, current_classes, difficultys, 2,
+                            min_overlaps)
+            mAP40_3d = get_mAP40(ret['precision'])
+        return (mAP40_bev, mAP40_3d)
+
+    def aicv_eval(self, 
+                  gt_annos,
+                  dt_annos,
+                  current_classes,
+                  eval_types=['bev', '3d']):
+        """AICV evaluation.
+
+        Args:
+            gt_annos (list[dict]): Contain gt information of each sample.
+            dt_annos (list[dict]): Contain detected information of each sample.
+            current_classes (list[str]): Classes to evaluation.
+            eval_types (list[str], optional): Types to eval.
+                Defaults to ['bev', '3d'].
+
+        Returns:
+            tuple: String and dict of evaluation results.
+        """
+        assert len(eval_types) > 0, 'must contain at least one evaluation type'
+        if 'aos' in eval_types:
+            assert 'bbox' in eval_types, 'must evaluate bbox when evaluating aos'
+        overlap_0_7 = np.array([[0.7, 0.5, 0.5, 0.7, 0.5],
+                                [0.7, 0.5, 0.5, 0.7, 0.5],
+                                [0.7, 0.5, 0.5, 0.7, 0.5]])
+        overlap_0_5 = np.array([[0.5, 0.25, 0.25, 0.5, 0.25],
+                                [0.5, 0.25, 0.25, 0.5, 0.25],
+                                [0.5, 0.25, 0.25, 0.5, 0.25]])
+        # 2 overlaps; 3 metrics: [bbox, bev, 3d]; 5 classes
+        min_overlaps = np.stack([overlap_0_7, overlap_0_5], axis=0)  # [2, 3, 5]
+        class_to_name = {
+            0: 'Car',
+            1: 'Pedestrian',
+            2: 'Cyclist',
+            3: 'Van',
+            4: 'Person_sitting',
+        }
+        name_to_class = {v: n for n, v in class_to_name.items()}
+        if not isinstance(current_classes, (list, tuple)):
+            current_classes = [current_classes]
+        current_classes_int = []
+        for curcls in current_classes:
+            if isinstance(curcls, str):
+                current_classes_int.append(name_to_class[curcls])
+            else:
+                current_classes_int.append(curcls)
+        current_classes = current_classes_int
+        min_overlaps = min_overlaps[:, :, current_classes]
+        result = ''
+        mAP40_bev, mAP40_3d = self.do_eval(gt_annos, dt_annos, current_classes, 
+                                           min_overlaps, eval_types)
+
+        ret_dict = {}
+        difficulty = ['moderate']
+        # Calculate AP40
+        result += '\n----------- AP40 Results ------------\n'
+        mean_bev = mAP40_bev.mean(axis=0)
+        mean_3d = mAP40_3d.mean(axis=0)
+
+        # overlap 0.7
+        result += '\t'
+        for j, curcls in enumerate(current_classes):
+            result += '{}({}) '.format(class_to_name[curcls], min_overlaps[0, 1, j])
+        result += 'mAP'
+        for i in range(min_overlaps.shape[0]):
+            result += '\n{}\t'.format(eval_types[i])
+            for j, curcls in enumerate(current_classes):
+                if eval_types[i] == 'bev':
+                    result += '{:.3f}\t'.format(*mAP40_bev[j, :, 0])
+                elif eval_types[i] == '3d':
+                    result += '{:.3f}\t'.format(*mAP40_3d[j, :, 0])
+            overall = mean_bev if eval_types[i] == 'bev' else mean_3d
+            result += '{:.2f}'.format(*overall[:, 0])
+        # overlap 0.5
+        result += '\n\n\t'
+        for j, curcls in enumerate(current_classes):
+            result += '{}({}) '.format(class_to_name[curcls], min_overlaps[1, 1, j])
+        result += 'mAP'
+        for i in range(min_overlaps.shape[0]):
+            result += '\n{}\t'.format(eval_types[i])
+            for j, curcls in enumerate(current_classes):
+                if eval_types[i] == 'bev':
+                    result += '{:.3f}\t'.format(*mAP40_bev[j, :, 1])
+                elif eval_types[i] == '3d':
+                    result += '{:.3f}\t'.format(*mAP40_3d[j, :, 1])
+            overall = mean_bev if eval_types[i] == 'bev' else mean_3d
+            result += '{:.2f}'.format(*overall[:, 1])
+
+        return result, ret_dict
+    
 
     def evaluate(self,
                  results,
@@ -336,7 +451,6 @@ class AicvDataset(Custom3DDataset):
             dict[str, float]: Results of each evaluation metric.
         """
         result_files, tmp_dir = self.format_results(results, pklfile_prefix)
-        from mmdet3d.core.evaluation import aicv_eval
         gt_annos = self.format_gt_annos()
 
         if isinstance(result_files, dict):
@@ -345,7 +459,7 @@ class AicvDataset(Custom3DDataset):
                 eval_types = ['bev', '3d']
                 if 'img' in name:
                     eval_types = ['bbox']
-                ap_result_str, ap_dict_ = aicv_eval(
+                ap_result_str, ap_dict_ = self.aicv_eval(
                     gt_annos,
                     result_files_,
                     self.CLASSES,
@@ -355,15 +469,6 @@ class AicvDataset(Custom3DDataset):
 
                 print_log(
                     f'Results of {name}:\n' + ap_result_str, logger=logger)
-
-        else:
-            if metric == 'img_bbox':
-                ap_result_str, ap_dict = aicv_eval(
-                    gt_annos, result_files, self.CLASSES, eval_types=['bbox'])
-            else:
-                ap_result_str, ap_dict = aicv_eval(gt_annos, result_files,
-                                                    self.CLASSES)
-            print_log('\n' + ap_result_str, logger=logger)
 
         if tmp_dir is not None:
             tmp_dir.cleanup()
@@ -433,8 +538,7 @@ class AicvDataset(Custom3DDataset):
                     w = box_lidar[4]
                     h = box_lidar[5]
                     r = box_lidar[6]
-
-                    z = z - h / 2
+                    
                     r = -r - np.pi / 2
                     if r < -np.pi:
                         r = r + 2 * np.pi
