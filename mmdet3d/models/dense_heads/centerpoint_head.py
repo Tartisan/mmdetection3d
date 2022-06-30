@@ -548,7 +548,11 @@ class CenterHead(BaseModule):
                     ind[new_idx] = y * feature_map_size[0] + x
                     mask[new_idx] = 1
                     # TODO: support other outdoor dataset
-                    vx, vy = task_boxes[idx][k][7:]
+                    if task_boxes[idx].shape[1] > 7:
+                        vx, vy = task_boxes[idx][k][7:]
+                    else:
+                        vx = torch.zeros_like(task_boxes[idx][k][6])
+                        vy = torch.zeros_like(task_boxes[idx][k][6])
                     rot = task_boxes[idx][k][6]
                     box_dim = task_boxes[idx][k][3:6]
                     if self.norm_bbox:

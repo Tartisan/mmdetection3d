@@ -27,6 +27,8 @@ class Backbone(nn.Module):
         pts_bbox_head = cfg['pts_bbox_head']
         train_cfg = cfg['train_cfg']
         test_cfg = cfg['test_cfg']
+        # tensorrt max support 3840
+        self.nms_pre = min(3840, cfg['test_cfg']['pts']['nms_pre'])
         pts_train_cfg = train_cfg.pts if train_cfg else None
         pts_bbox_head.update(train_cfg=pts_train_cfg)
         pts_test_cfg = test_cfg.pts if test_cfg else None
@@ -37,8 +39,8 @@ class Backbone(nn.Module):
         self.box_code_size = self.bbox_coder.code_size
         loss_cls = cfg['pts_bbox_head']['loss_cls']
         self.use_sigmoid_cls = loss_cls.get('use_sigmoid', False)
-        # self.dir_limit_offset = cfg['pts_bbox_head']['dir_limit_offset']
-        # self.dir_offset = cfg['pts_bbox_head']['dir_offset']
+        self.dir_limit_offset = 0.0
+        self.dir_offset = cfg['pts_bbox_head']['dir_offset']
 
     def forward(self, input):
         # nuscenes
@@ -57,10 +59,53 @@ class Backbone(nn.Module):
         x = self.pts_neck(x)
         x = self.pts_bbox_head(x)
 
-        bboxes, scores, labels = self.get_boxes(*x, anchors)
-        return bboxes, scores, labels
+        bboxes, scores = self.get_boxes(*x, anchors)
+        return bboxes, scores
         # return x, anchors
-    
+
+    def get_boxes(self, cls_scores, bbox_preds, dir_preds, anchors):
+        cls_score = cls_scores[0].detach()
+        bbox_pred = bbox_preds[0].detach()
+        dir_pred = dir_preds[0].detach()
+        cls_score = cls_scores[0].detach()
+        bbox_pred = bbox_preds[0].detach()
+        dir_pred = dir_preds[0].detach()
+        bboxes, scores = self.get_bboxes_single(cls_score, bbox_pred,
+                                                dir_pred, anchors)
+        return bboxes, scores
+
+    def get_bboxes_single(self, cls_scores, bbox_preds, dir_preds, anchors):
+        cls_score = cls_scores[0]
+        bbox_pred = bbox_preds[0]
+        dir_pred = dir_preds[0]
+        dir_pred = dir_pred.permute(1, 2, 0).reshape(-1, 2)
+        dir_score = torch.max(dir_pred, dim=-1)[1]
+        cls_score = cls_score.permute(1, 2, 0).reshape(-1, self.pts_bbox_head.num_classes)
+        if self.use_sigmoid_cls:
+            scores = cls_score.sigmoid()
+        else:
+            scores = cls_score.softmax(-1)
+        bbox_pred = bbox_pred.permute(1, 2, 0).reshape(-1, self.box_code_size)
+
+        print('nms_pre', self.nms_pre)
+        if self.use_sigmoid_cls:
+            max_scores, _ = scores.max(dim=1)
+        else:
+            max_scores, _ = scores[:, :-1].max(dim=1)
+        _, topk_inds = max_scores.topk(self.nms_pre)
+        topk_inds = topk_inds.long()
+        anchors = anchors[topk_inds, :]
+        bbox_pred = bbox_pred[topk_inds, :]
+        scores = scores[topk_inds, :]
+        dir_score = dir_score[topk_inds]
+        bboxes = self.decode(anchors, bbox_pred)
+
+        dir_rot = limit_period(bboxes[..., 6] - self.dir_offset,
+                               self.dir_limit_offset, np.pi)
+        bboxes[..., 6] = (dir_rot + self.dir_offset + 
+                          np.pi * dir_score.to(bboxes.dtype))
+        return bboxes, scores
+
     def decode(self, anchors, deltas):
         """Apply transformation `deltas` (dx, dy, dz, dw, dh, dl, dr, dv*) to
         `boxes`.
@@ -74,8 +119,8 @@ class Backbone(nn.Module):
             torch.Tensor: Decoded boxes.
         """
         cas, cts = [], []
-        # xa, ya, za, wa, la, ha, ra, *cas = torch.split(anchors, 1, dim=-1)
-        xa, ya, za, la, wa, ha, ra, *cas = torch.split(anchors, 1, dim=-1)
+        xa, ya, za, wa, la, ha, ra, *cas = torch.split(anchors, 1, dim=-1)
+        # xa, ya, za, la, wa, ha, ra, *cas = torch.split(anchors, 1, dim=-1)
         xt, yt, zt, wt, lt, ht, rt, *cts = torch.split(deltas, 1, dim=-1)
         za = za + ha / 2
         diagonal = torch.sqrt(la**2 + wa**2)
@@ -90,45 +135,6 @@ class Backbone(nn.Module):
         zg = zg - hg / 2
         cgs = [t + a for t, a in zip(cts, cas)]
         return torch.cat([xg, yg, zg, wg, lg, hg, rg, *cgs], dim=-1)
-
-    def get_boxes(self, cls_scores, bbox_preds, dir_cls_preds, anchors):
-        cls_score = cls_scores[0].detach()
-        bbox_pred = bbox_preds[0].detach()
-        dir_cls_pred = dir_cls_preds[0].detach()
-        cls_score = cls_scores[0].detach()
-        bbox_pred = bbox_preds[0].detach()
-        dir_cls_pred = dir_cls_preds[0].detach()
-        bboxes, scores, labels = self.get_bboxes_single(cls_score, bbox_pred,
-                                            dir_cls_pred, anchors)
-        return bboxes, scores, labels
-
-    def get_bboxes_single(self, cls_scores, bbox_preds, dir_cls_preds, anchors):
-        cls_score = cls_scores[0]
-        bbox_pred = bbox_preds[0]
-        dir_cls_pred = dir_cls_preds[0]
-        dir_cls_pred = dir_cls_pred.permute(1, 2, 0).reshape(-1, 2)
-        dir_cls_score = torch.max(dir_cls_pred, dim=-1)[1]
-        cls_score = cls_score.permute(1, 2, 0).reshape(-1, self.pts_bbox_head.num_classes)
-        if self.use_sigmoid_cls:
-            scores = cls_score.sigmoid()
-        else:
-            scores = cls_score.softmax(-1)
-        bbox_pred = bbox_pred.permute(1, 2,
-                                        0).reshape(-1, self.box_code_size)
-
-        nms_pre = 1000
-        if self.use_sigmoid_cls:
-            max_scores, _ = scores.max(dim=1)
-        else:
-            max_scores, _ = scores[:, :-1].max(dim=1)
-        _, topk_inds = max_scores.topk(nms_pre)
-        topk_inds = topk_inds.long()
-        anchors = anchors[topk_inds, :]
-        bbox_pred = bbox_pred[topk_inds, :]
-        scores = scores[topk_inds, :]
-        dir_cls_score = dir_cls_score[topk_inds]
-        bboxes = self.decode(anchors, bbox_pred)
-        return bboxes, scores, dir_cls_score
 
 def parse_model(model):
     for name, parameters in model.named_parameters():

@@ -91,7 +91,8 @@ class AICV2KITTI(object):
     def __init__(self,
                  load_dir,
                  save_dir,
-                 test_mode=False, 
+                 enable_rotate_45degree=False,
+                 test_mode=False,
                  workers=64):
         self.filter_empty_3dboxes = True
         self.filter_no_label_zone_points = True
@@ -112,28 +113,40 @@ class AICV2KITTI(object):
         self.aicv_to_kitti_class_map = {
             'smallMot': 'Car',
             'bigMot': 'Car',
-            'OnlyTricycle': 'Car',
-            'OnlyBicycle': 'Car',
+            'OnlyTricycle': 'NonMot',
+            'OnlyBicycle': 'NonMot',
             'Tricyclist': 'Cyclist',
             'bicyclist': 'Cyclist',
             'motorcyclist': 'Cyclist',
             'pedestrian': 'Pedestrian',
-            'TrafficCone': 'Sign', 
-            'stopBar': 'Sign', 
-            'crashBarrel': 'Sign', 
-            'safetyBarrier': 'Sign', 
-            'sign': 'Sign', 
-            'smallMovable': 'DontCare',
-            'smallUnmovable': 'DontCare', 
+            'TrafficCone': 'TrafficCone', 
+            'stopBar': 'Others', 
+            'crashBarrel': 'Others', 
+            'safetyBarrier': 'Others', 
+            'sign': 'Others', 
+            'smallMovable': 'Others',
+            'smallUnmovable': 'Others', 
             'fog': 'DontCare',
-            'others': 'DontCare'
+            'others': 'Others'
         }
-        self.selected_kitti_classes = ['Car', 'Cyclist', 'Pedestrian']
+        self.selected_kitti_classes = [
+            'Car', 'Cyclist', 'Pedestrian', 'NonMot', 'TrafficCone', 'Others'
+        ]
         
         self.load_dir = load_dir
         self.save_dir = save_dir
+        self.enable_rotate_45degree = enable_rotate_45degree
         self.test_mode = test_mode
         self.workers = int(workers)
+
+        self.rotate_matrix = np.eye(4)
+        if enable_rotate_45degree:
+            self.rotate_matrix = np.array(
+                [[np.cos(np.pi/4),  np.sin(np.pi/4), 0, 0, 0], 
+                 [-np.sin(np.pi/4), np.cos(np.pi/4), 0, 0, 0], 
+                 [0, 0, 1, 0, 0], 
+                 [0, 0, 0, 1, 0], 
+                 [0, 0, 0, 0, 1]])
 
         self.label_infos = _read_result(load_dir + f'/result.txt')
 
@@ -204,6 +217,7 @@ class AICV2KITTI(object):
             stamp = pcd.pc_data['timestamp']
         points = np.stack([pcd.pc_data['x'], pcd.pc_data['y'], pcd.pc_data['z'], 
                            pcd.pc_data['intensity'], stamp]).transpose(1, 0)
+        points = np.dot(points, self.rotate_matrix)
         points.astype(np.float32).tofile(point_cloud_path)
 
     def save_label(self, annotations, frame_idx):
@@ -239,10 +253,16 @@ class AICV2KITTI(object):
             length = size[0]
             width = size[1]
             height = size[2]
-            x = position['x']
-            y = position['y']
+            x = position['x'] * self.rotate_matrix[0, 0] + \
+                position['y'] * self.rotate_matrix[1, 0]
+            y = position['x'] * self.rotate_matrix[0, 1] + \
+                position['y'] * self.rotate_matrix[1, 1]
             z = position['z'] - height / 2
             rotation_y = rotation['phi']
+            if self.enable_rotate_45degree:
+                rotation_y += np.pi / 4
+            if rotation_y > np.pi:
+                rotation_y -= 2 * np.pi
             # [w, h, l] will transfose to [l, w, h] in get_label_anno() of kitti_data_utils.py
             line = type + \
                 ' {} {} {} {} {} {} {} {} {} {} {} {} {} {}\n'.format(

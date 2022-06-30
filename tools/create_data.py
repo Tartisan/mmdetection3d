@@ -217,6 +217,7 @@ def aicv_data_prep(root_path,
     converter = aicv.AICV2KITTI(
         root_path,
         save_dir,
+        enable_rotate_45degree=True,
         test_mode=False, 
         workers=workers)
     converter.convert()

@@ -44,6 +44,10 @@ def parse_args():
         help='Whether to perform online visualization. Note that you often '
         'need a monitor to do so.')
     parser.add_argument(
+        '--non-blocking',
+        action='store_true',
+        help='Whether to perform non-blocking visualization.')
+    parser.add_argument(
         '--cfg-options',
         nargs='+',
         action=DictAction,
@@ -104,22 +108,25 @@ def to_depth_mode(points, bboxes):
     return points, bboxes
 
 
-def show_det_data(input, out_dir, show=False):
+def show_det_data(input, out_dir, show=False, visualizer=None):
     """Visualize 3D point cloud and 3D bboxes."""
     img_metas = input['img_metas']._data
     points = input['points']._data.numpy()
     gt_bboxes = input['gt_bboxes_3d']._data.tensor
+    gt_labels = input['gt_labels_3d']._data.numpy()
     if img_metas['box_mode_3d'] != Box3DMode.DEPTH:
         points, gt_bboxes = to_depth_mode(points, gt_bboxes)
     filename = osp.splitext(osp.basename(img_metas['pts_filename']))[0]
     show_result(
         points,
-        gt_bboxes.clone(),
         None,
+        gt_bboxes.numpy(),
         out_dir,
         filename,
         show=show,
-        snapshot=True)
+        snapshot=True, 
+        pred_labels=gt_labels,
+        visualizer=visualizer)
 
 
 def show_seg_data(input, out_dir, show=False):
@@ -211,10 +218,16 @@ def main():
     vis_task = args.task  # 'det', 'seg', 'multi_modality-det', 'mono-det'
     progress_bar = mmcv.ProgressBar(len(dataset))
 
+    vis = None
+    if args.non_blocking:
+        from mmdet3d.core.visualizer.open3d_vis import Visualizer
+        vis = Visualizer(None)
+
     for input in dataset:
         if vis_task in ['det', 'multi_modality-det']:
             # show 3D bboxes on 3D point clouds
-            show_det_data(input, args.output_dir, show=args.online)
+            show_det_data(
+                input, args.output_dir, show=args.online, visualizer=vis)
         if vis_task in ['multi_modality-det', 'mono-det']:
             # project 3D bboxes to 2D image
             show_proj_bbox_img(

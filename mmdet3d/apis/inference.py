@@ -331,7 +331,8 @@ def show_det_result_meshlab(data,
                             gt=None, 
                             score_thr=0.0,
                             show=False,
-                            snapshot=False):
+                            snapshot=False, 
+                            visualizer=None):
     """Show 3D detection result by meshlab."""
     points = data['points'][0][0].cpu().numpy()
     pts_filename = data['img_metas'][0][0]['pts_filename']
@@ -372,7 +373,8 @@ def show_det_result_meshlab(data,
         file_name,
         show=show,
         snapshot=snapshot, 
-        pred_labels=pred_labels)
+        pred_labels=pred_labels, 
+        visualizer=visualizer)
 
     return file_name
 
@@ -498,7 +500,8 @@ def show_result_meshlab(data,
                         show=False,
                         snapshot=False,
                         task='det',
-                        palette=None):
+                        palette=None, 
+                        visualizer=None):
     """Show result by meshlab.
 
     Args:
@@ -523,7 +526,7 @@ def show_result_meshlab(data,
 
     if task in ['det', 'multi_modality-det']:
         file_name = show_det_result_meshlab(data, result, out_dir, gt, score_thr,
-                                            show, snapshot)
+                                            show, snapshot, visualizer)
 
     if task in ['seg']:
         file_name = show_seg_result_meshlab(data, result, out_dir, palette,

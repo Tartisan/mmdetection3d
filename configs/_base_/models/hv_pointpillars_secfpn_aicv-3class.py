@@ -8,7 +8,7 @@ model = dict(
     type='MVXFasterRCNN',
     pts_voxel_layer=dict(
         max_num_points=20,
-        point_cloud_range=[-74.88, -74.88, -3, 74.88, 74.88, 3],
+        point_cloud_range=[-74.88, -74.88, -4, 74.88, 74.88, 2],
         voxel_size=voxel_size,
         max_voxels=(32000, 32000)),
     pts_voxel_encoder=dict(
@@ -19,7 +19,7 @@ model = dict(
         voxel_size=voxel_size,
         with_cluster_center=True,
         with_voxel_center=True,
-        point_cloud_range=[-74.88, -74.88, -3, 74.88, 74.88, 3],
+        point_cloud_range=[-74.88, -74.88, -4, 74.88, 74.88, 2],
         norm_cfg=dict(type='naiveSyncBN1d', eps=1e-3, momentum=0.01)),
     pts_middle_encoder=dict(
         type='PointPillarsScatter', in_channels=64, output_shape=[468, 468]),
@@ -38,24 +38,20 @@ model = dict(
         out_channels=[128, 128, 128]),
     pts_bbox_head=dict(
         type='Anchor3DHead',
-        num_classes=6,
+        num_classes=3,
         in_channels=384,
         feat_channels=384,
         use_direction_classifier=True,
         anchor_generator=dict(
             type='AlignedAnchor3DRangeGenerator',
-            ranges=[[-74.88, -74.88, -1.67, 74.88, 74.88, -1.67],
-                    [-74.88, -74.88, -1.73, 74.88, 74.88, -1.73],
-                    [-74.88, -74.88, -1.45, 74.88, 74.88, -1.45],
-                    [-74.88, -74.88, -1.67, 74.88, 74.88, -1.67],
-                    [-74.88, -74.88, -1.81, 74.88, 74.88, -1.81],
-                    [-74.88, -74.88, -1.38, 74.88, 74.88, -1.38]],
-            sizes=[[6.35, 1.71, 1.49],      # Car
-                   [1.54, 0.82, 1.43],      # Cyclist
-                   [0.51, 0.60, 1.30],      # Pedestrian
-                   [1.51, 0.61, 1.03],      # NonMot
-                   [0.31, 0.31, 0.61],      # TrafficCone
-                   [2.76, 1.65, 1.01]],     # Others
+            ranges=[[-74.88, -74.88, -1.78, 74.88, 74.88, -1.78],
+                    [-74.88, -74.88, -1.0, 74.88, 74.88, -1.0],
+                    [-74.88, -74.88, -1.0, 74.88, 74.88, -1.0]],
+            sizes=[
+                [4.73, 2.08, 1.77],  # car
+                [1.81, 0.84, 1.77],  # cyclist
+                [0.91, 0.84, 1.74],  # pedestrian
+            ],
             rotations=[0, 1.57],
             reshape_out=False),
         diff_rad_by_sin=True,
@@ -74,7 +70,7 @@ model = dict(
     train_cfg=dict(
         pts=dict(
             assigner=[
-                dict(  # car
+                dict(  # smallmot
                     type='MaxIoUAssigner',
                     iou_calculator=dict(type='BboxOverlapsNearest3D'),
                     pos_iou_thr=0.55,
@@ -95,27 +91,6 @@ model = dict(
                     neg_iou_thr=0.3,
                     min_pos_iou=0.3,
                     ignore_iof_thr=-1),
-                dict(  # nonmot
-                    type='MaxIoUAssigner',
-                    iou_calculator=dict(type='BboxOverlapsNearest3D'),
-                    pos_iou_thr=0.5,
-                    neg_iou_thr=0.3,
-                    min_pos_iou=0.3,
-                    ignore_iof_thr=-1),
-                dict(  # trafficcone
-                    type='MaxIoUAssigner',
-                    iou_calculator=dict(type='BboxOverlapsNearest3D'),
-                    pos_iou_thr=0.5,
-                    neg_iou_thr=0.3,
-                    min_pos_iou=0.3,
-                    ignore_iof_thr=-1),
-                dict(  # others
-                    type='MaxIoUAssigner',
-                    iou_calculator=dict(type='BboxOverlapsNearest3D'),
-                    pos_iou_thr=0.5,
-                    neg_iou_thr=0.3,
-                    min_pos_iou=0.3,
-                    ignore_iof_thr=-1)
             ],
             allowed_border=0,
             code_weight=[1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0],

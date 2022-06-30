@@ -16,7 +16,7 @@ from ..core.bbox import (Box3DMode, CameraInstance3DBoxes, Coord3DMode,
                          LiDARInstance3DBoxes, points_cam2img)
 from .custom_3d import Custom3DDataset
 from .pipelines import Compose
-from ..core.evaluation.kitti_utils.eval import eval_class, get_mAP40
+from ..core.evaluation.aicv_utils import aicv_eval
 
 
 @DATASETS.register_module()
@@ -24,7 +24,7 @@ class AicvDataset(Custom3DDataset):
     r"""AICV Dataset.
 
     This class serves as the API for experiments on the `AICV Dataset
-    <http://www.cvlibs.net/datasets/kitti/eval_object.php?obj_benchmark=3d>`_.
+    <http://www.cvlibs.net/datasets/kitti/eval_object.php?obj_benchmark=3d>`.
 
     Args:
         data_root (str): Path of dataset root.
@@ -54,7 +54,7 @@ class AicvDataset(Custom3DDataset):
             filter invalid predicted boxes.
             Default: [-85, -85, -5, 85, 85, 5].
     """
-    CLASSES = ('Car', 'Cyclist', 'Pedestrian')
+    CLASSES = ('Car', 'Cyclist', 'Pedestrian', 'NonMot', 'TrafficCone', 'Others')
 
     def __init__(self,
                  data_root,
@@ -68,6 +68,7 @@ class AicvDataset(Custom3DDataset):
                  filter_empty_gt=True,
                  test_mode=False,
                  pcd_limit_range=[-85, -85, -5, 85, 85, 5],
+                 use_valid_flag=False, 
                  **kwargs):
         super().__init__(
             data_root=data_root,
@@ -85,6 +86,7 @@ class AicvDataset(Custom3DDataset):
         assert self.modality is not None
         self.pcd_limit_range = pcd_limit_range
         self.pts_prefix = pts_prefix
+        self.use_valid_flag = use_valid_flag
 
     def _get_pts_filename(self, idx):
         """Get point cloud filename according to the given index.
@@ -307,116 +309,6 @@ class AicvDataset(Custom3DDataset):
             gt_annos.append(anno)
         return gt_annos
 
-    def do_eval(self, 
-                gt_annos,
-                dt_annos,
-                current_classes,
-                min_overlaps,
-                eval_types=['bev', '3d']):
-        # min_overlaps: [num_minoverlap, metric, num_class]
-        difficultys = [1]
-        mAP40_bev = None
-        if 'bev' in eval_types:
-            ret = eval_class(gt_annos, dt_annos, current_classes, difficultys, 1,
-                            min_overlaps)
-            mAP40_bev = get_mAP40(ret['precision'])
-
-        mAP40_3d = None
-        if '3d' in eval_types:
-            ret = eval_class(gt_annos, dt_annos, current_classes, difficultys, 2,
-                            min_overlaps)
-            mAP40_3d = get_mAP40(ret['precision'])
-        return (mAP40_bev, mAP40_3d)
-
-    def aicv_eval(self, 
-                  gt_annos,
-                  dt_annos,
-                  current_classes,
-                  eval_types=['bev', '3d']):
-        """AICV evaluation.
-
-        Args:
-            gt_annos (list[dict]): Contain gt information of each sample.
-            dt_annos (list[dict]): Contain detected information of each sample.
-            current_classes (list[str]): Classes to evaluation.
-            eval_types (list[str], optional): Types to eval.
-                Defaults to ['bev', '3d'].
-
-        Returns:
-            tuple: String and dict of evaluation results.
-        """
-        assert len(eval_types) > 0, 'must contain at least one evaluation type'
-        if 'aos' in eval_types:
-            assert 'bbox' in eval_types, 'must evaluate bbox when evaluating aos'
-        overlap_0_7 = np.array([[0.7, 0.5, 0.5, 0.7, 0.5],
-                                [0.7, 0.5, 0.5, 0.7, 0.5],
-                                [0.7, 0.5, 0.5, 0.7, 0.5]])
-        overlap_0_5 = np.array([[0.5, 0.25, 0.25, 0.5, 0.25],
-                                [0.5, 0.25, 0.25, 0.5, 0.25],
-                                [0.5, 0.25, 0.25, 0.5, 0.25]])
-        # 2 overlaps; 3 metrics: [bbox, bev, 3d]; 5 classes
-        min_overlaps = np.stack([overlap_0_7, overlap_0_5], axis=0)  # [2, 3, 5]
-        class_to_name = {
-            0: 'Car',
-            1: 'Pedestrian',
-            2: 'Cyclist',
-            3: 'Van',
-            4: 'Person_sitting',
-        }
-        name_to_class = {v: n for n, v in class_to_name.items()}
-        if not isinstance(current_classes, (list, tuple)):
-            current_classes = [current_classes]
-        current_classes_int = []
-        for curcls in current_classes:
-            if isinstance(curcls, str):
-                current_classes_int.append(name_to_class[curcls])
-            else:
-                current_classes_int.append(curcls)
-        current_classes = current_classes_int
-        min_overlaps = min_overlaps[:, :, current_classes]
-        result = ''
-        mAP40_bev, mAP40_3d = self.do_eval(gt_annos, dt_annos, current_classes, 
-                                           min_overlaps, eval_types)
-
-        ret_dict = {}
-        difficulty = ['moderate']
-        # Calculate AP40
-        result += '\n----------- AP40 Results ------------\n'
-        mean_bev = mAP40_bev.mean(axis=0)
-        mean_3d = mAP40_3d.mean(axis=0)
-
-        # overlap 0.7
-        result += '\t'
-        for j, curcls in enumerate(current_classes):
-            result += '{}({}) '.format(class_to_name[curcls], min_overlaps[0, 1, j])
-        result += 'mAP'
-        for i in range(min_overlaps.shape[0]):
-            result += '\n{}\t'.format(eval_types[i])
-            for j, curcls in enumerate(current_classes):
-                if eval_types[i] == 'bev':
-                    result += '{:.3f}\t'.format(*mAP40_bev[j, :, 0])
-                elif eval_types[i] == '3d':
-                    result += '{:.3f}\t'.format(*mAP40_3d[j, :, 0])
-            overall = mean_bev if eval_types[i] == 'bev' else mean_3d
-            result += '{:.2f}'.format(*overall[:, 0])
-        # overlap 0.5
-        result += '\n\n\t'
-        for j, curcls in enumerate(current_classes):
-            result += '{}({}) '.format(class_to_name[curcls], min_overlaps[1, 1, j])
-        result += 'mAP'
-        for i in range(min_overlaps.shape[0]):
-            result += '\n{}\t'.format(eval_types[i])
-            for j, curcls in enumerate(current_classes):
-                if eval_types[i] == 'bev':
-                    result += '{:.3f}\t'.format(*mAP40_bev[j, :, 1])
-                elif eval_types[i] == '3d':
-                    result += '{:.3f}\t'.format(*mAP40_3d[j, :, 1])
-            overall = mean_bev if eval_types[i] == 'bev' else mean_3d
-            result += '{:.2f}'.format(*overall[:, 1])
-
-        return result, ret_dict
-    
-
     def evaluate(self,
                  results,
                  metric=None,
@@ -459,7 +351,7 @@ class AicvDataset(Custom3DDataset):
                 eval_types = ['bev', '3d']
                 if 'img' in name:
                     eval_types = ['bbox']
-                ap_result_str, ap_dict_ = self.aicv_eval(
+                ap_result_str, ap_dict_ = aicv_eval(
                     gt_annos,
                     result_files_,
                     self.CLASSES,

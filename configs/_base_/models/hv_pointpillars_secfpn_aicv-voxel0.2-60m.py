@@ -3,12 +3,12 @@
 # Usually voxel size is changed consistently with the point cloud range
 # If point cloud range is modified, do remember to change all related
 # keys in the config.
-voxel_size = [0.32, 0.32, 6]
+voxel_size = [0.2, 0.2, 6]
 model = dict(
     type='MVXFasterRCNN',
     pts_voxel_layer=dict(
         max_num_points=20,
-        point_cloud_range=[-74.88, -74.88, -3, 74.88, 74.88, 3],
+        point_cloud_range=[-60, -60, -3, 60, 60, 3],
         voxel_size=voxel_size,
         max_voxels=(32000, 32000)),
     pts_voxel_encoder=dict(
@@ -19,10 +19,10 @@ model = dict(
         voxel_size=voxel_size,
         with_cluster_center=True,
         with_voxel_center=True,
-        point_cloud_range=[-74.88, -74.88, -3, 74.88, 74.88, 3],
+        point_cloud_range=[-60, -60, -3, 60, 60, 3],
         norm_cfg=dict(type='naiveSyncBN1d', eps=1e-3, momentum=0.01)),
     pts_middle_encoder=dict(
-        type='PointPillarsScatter', in_channels=64, output_shape=[468, 468]),
+        type='PointPillarsScatter', in_channels=64, output_shape=[600, 600]),
     pts_backbone=dict(
         type='SECOND',
         in_channels=64,
@@ -44,19 +44,19 @@ model = dict(
         use_direction_classifier=True,
         anchor_generator=dict(
             type='AlignedAnchor3DRangeGenerator',
-            ranges=[[-74.88, -74.88, -1.67, 74.88, 74.88, -1.67],
-                    [-74.88, -74.88, -1.73, 74.88, 74.88, -1.73],
-                    [-74.88, -74.88, -1.45, 74.88, 74.88, -1.45],
-                    [-74.88, -74.88, -1.67, 74.88, 74.88, -1.67],
-                    [-74.88, -74.88, -1.81, 74.88, 74.88, -1.81],
-                    [-74.88, -74.88, -1.38, 74.88, 74.88, -1.38]],
+            ranges=[[-60, -60, -1.67, 60, 60, -1.67],
+                    [-60, -60, -1.73, 60, 60, -1.73],
+                    [-60, -60, -1.45, 60, 60, -1.45],
+                    [-60, -60, -1.67, 60, 60, -1.67],
+                    [-60, -60, -1.81, 60, 60, -1.81],
+                    [-60, -60, -1.38, 60, 60, -1.38]],
             sizes=[[6.35, 1.71, 1.49],      # Car
                    [1.54, 0.82, 1.43],      # Cyclist
                    [0.51, 0.60, 1.30],      # Pedestrian
                    [1.51, 0.61, 1.03],      # NonMot
                    [0.31, 0.31, 0.61],      # TrafficCone
                    [2.76, 1.65, 1.01]],     # Others
-            rotations=[0, 1.57],
+            rotations=[0.7854, 2.3562],
             reshape_out=False),
         diff_rad_by_sin=True,
         dir_offset=-0.7854,  # -pi / 4

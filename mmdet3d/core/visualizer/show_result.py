@@ -10,15 +10,12 @@ from .image_vis import (draw_camera_bbox3d_on_img, draw_depth_bbox3d_on_img,
 
 
 # http://www1.ynao.ac.cn/~jinhuahe/know_base/othertopics/computerissues/RGB_colortable.htm
-PALETTE = [[0, 255, 0],     # 绿色
+PALETTE = [[0, 0, 255],     # 蓝色
            [0, 255, 255],   # 青色
            [255, 153, 18],  # 镉黄
            [255, 0, 255],   # 深红
-           [3, 138, 158],   # 锰蓝
-           [160, 32, 240],  # 紫色
-           [255, 255, 255], # 黑色
-           [255, 97, 0],    # 橙色
            [255, 192, 203], # 粉红
+           [255, 97, 0],    # 橙色
            [255, 187, 120],
            [188, 189, 34],
            [140, 86, 75],
@@ -109,7 +106,8 @@ def show_result(points,
                 filename,
                 show=False,
                 snapshot=False,
-                pred_labels=None):
+                pred_labels=None, 
+                visualizer=None):
     """Convert results into format that is directly readable for meshlab.
 
     Args:
@@ -123,14 +121,22 @@ def show_result(points,
             Defaults to False.
         pred_labels (np.ndarray, optional): Predicted labels of boxes.
             Defaults to None.
+        visualizer (open3d_vis.Visualizer, optional): For Non-blocking 
+            visualization
     """
-    result_path = osp.join(out_dir, filename)
+    # result_path = osp.join(out_dir, filename)
+    result_path = out_dir
     mmcv.mkdir_or_exist(result_path)
 
     if show:
-        from .open3d_vis import Visualizer
-
-        vis = Visualizer(points)
+        if visualizer is None:
+            from .open3d_vis import Visualizer
+            vis = Visualizer(points)
+        else:
+            vis = visualizer
+            vis.o3d_visualizer.clear_geometries()
+            vis.add_points(points)
+        
         if pred_bboxes is not None:
             if pred_labels is None:
                 vis.add_bboxes(bbox3d=pred_bboxes)
@@ -149,25 +155,37 @@ def show_result(points,
                         bbox_color=[c / 255.0 for c in PALETTE[i]])
 
         if gt_bboxes is not None:
-            vis.add_bboxes(bbox3d=gt_bboxes, bbox_color=(0, 0, 1))
+            vis.add_bboxes(bbox3d=gt_bboxes, bbox_color=(0, 1, 0))
         show_path = osp.join(result_path,
                              f'{filename}_online.png') if snapshot else None
-        vis.show(show_path)
+        
+        if visualizer is None:
+            vis.show(show_path)
+        else:
+            ctr = vis.o3d_visualizer.get_view_control()
+            ctr.set_lookat([0,0,0])
+            ctr.set_front([-1,-1,1])    # 设置垂直指向屏幕外的向量
+            ctr.set_up([0,0,1])         # 设置指向屏幕上方的向量
+            ctr.set_zoom(0.1)
+            vis.o3d_visualizer.poll_events()
+            vis.o3d_visualizer.update_renderer()
+            if show_path is not None:
+                vis.o3d_visualizer.capture_screen_image(show_path)
 
-    if points is not None:
-        _write_obj(points, osp.join(result_path, f'{filename}_points.obj'))
+    # if points is not None:
+    #     _write_obj(points, osp.join(result_path, f'{filename}_points.obj'))
 
-    if gt_bboxes is not None:
-        # bottom center to gravity center
-        gt_bboxes[..., 2] += gt_bboxes[..., 5] / 2
-        _write_oriented_bbox(gt_bboxes,
-                             osp.join(result_path, f'{filename}_gt.obj'))
+    # if gt_bboxes is not None:
+    #     # bottom center to gravity center
+    #     gt_bboxes[..., 2] += gt_bboxes[..., 5] / 2
+    #     _write_oriented_bbox(gt_bboxes,
+    #                          osp.join(result_path, f'{filename}_gt.obj'))
 
-    if pred_bboxes is not None:
-        # bottom center to gravity center
-        pred_bboxes[..., 2] += pred_bboxes[..., 5] / 2
-        _write_oriented_bbox(pred_bboxes,
-                             osp.join(result_path, f'{filename}_pred.obj'))
+    # if pred_bboxes is not None:
+    #     # bottom center to gravity center
+    #     pred_bboxes[..., 2] += pred_bboxes[..., 5] / 2
+    #     _write_oriented_bbox(pred_bboxes,
+    #                          osp.join(result_path, f'{filename}_pred.obj'))
 
 
 def show_seg_result(points,
