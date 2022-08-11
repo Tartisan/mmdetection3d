@@ -107,7 +107,6 @@ venv.bak/
 
 # cython generated cpp
 data
-.vscode
 .idea
 
 # custom
@@ -130,6 +129,8 @@ data/scannet/scans/
 data/sunrgbd/OFFICIAL_SUNRGBD/
 *.obj
 *.ply
+*.onnx
+tmp
 
 # Waymo evaluation
 mmdet3d/core/evaluation/waymo_utils/compute_detection_metrics_main

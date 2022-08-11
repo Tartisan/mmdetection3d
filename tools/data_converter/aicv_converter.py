@@ -30,12 +30,13 @@ def _read_result(path):
         lines = f.readlines()
         for line in lines[1:]:
             infos = json.loads(line.split('\t')[1])
-            if 'labelData' not in infos.keys():
+            if 'labelData' not in infos.keys() and 'standardData' not in infos.keys():
                 continue
             relative_paths.append(infos['datasetsRelatedFiles'][0]['localRelativePath'])
             label_infos.append(infos)
 
     sorted_index = argsort(relative_paths)
+    _write_imageset_file(path.split('result')[0] + 'pcd.txt', relative_paths)
     return [label_infos[i] for i in sorted_index]
 
 
@@ -113,24 +114,27 @@ class AICV2KITTI(object):
         self.aicv_to_kitti_class_map = {
             'smallMot': 'Car',
             'bigMot': 'Car',
-            'OnlyTricycle': 'NonMot',
-            'OnlyBicycle': 'NonMot',
-            'Tricyclist': 'Cyclist',
-            'bicyclist': 'Cyclist',
-            'motorcyclist': 'Cyclist',
+            'OnlyTricycle': 'Bicycle',
+            'OnlyBicycle': 'Bicycle',
+            'Tricyclist': 'Bicycle',
+            'bicyclist': 'Bicycle',
+            'motorcyclist': 'Bicycle',
             'pedestrian': 'Pedestrian',
             'TrafficCone': 'TrafficCone', 
-            'stopBar': 'Others', 
-            'crashBarrel': 'Others', 
-            'safetyBarrier': 'Others', 
-            'sign': 'Others', 
-            'smallMovable': 'Others',
-            'smallUnmovable': 'Others', 
+            'stopBar': 'DontCare', 
+            'crashBarrel': 'DontCare', 
+            'safetyBarrier': 'DontCare', 
+            'sign': 'DontCare', 
+            'smallMovable': 'DontCare',
+            'smallUnmovable': 'DontCare', 
             'fog': 'DontCare',
-            'others': 'Others'
+            'others': 'DontCare'
         }
+        # self.selected_kitti_classes = [
+        #     'Car', 'Pedestrian', 'Bicycle', 'TrafficCone', 'Barrier'
+        # ]
         self.selected_kitti_classes = [
-            'Car', 'Cyclist', 'Pedestrian', 'NonMot', 'TrafficCone', 'Others'
+            'Car', 'Pedestrian', 'Bicycle', 'TrafficCone'
         ]
         
         self.load_dir = load_dir
@@ -150,7 +154,7 @@ class AICV2KITTI(object):
 
         self.label_infos = _read_result(load_dir + f'/result.txt')
 
-        self.imageset_dir = f'{self.load_dir}/kitti_format/ImageSets'
+        self.imageset_dir = f'{self.save_dir}/kitti_format/ImageSets'
         _split_imageset(self.imageset_dir, len(self))
 
         self.label_save_dir = f'{self.save_dir}/label'
@@ -169,7 +173,10 @@ class AICV2KITTI(object):
                 self.load_dir, 
                 infos['datasetsRelatedFiles'][0]['localRelativePath'], 
                 infos['datasetsRelatedFiles'][0]['fileName'])
-            annotations = infos['labelData']['result']
+            if 'standardData' in infos.keys():
+                annotations = infos['standardData']
+            elif 'labelData' in infos.keys():
+                annotations = infos['labelData']['result']
             # frame_id timestamp x y z qx qy qz qw
             pose = infos['poses']['velodyne_points']
             timestamp = infos['frameTimestamp']
@@ -193,7 +200,10 @@ class AICV2KITTI(object):
             self.load_dir, 
             infos['datasetsRelatedFiles'][0]['localRelativePath'], 
             infos['datasetsRelatedFiles'][0]['fileName'])
-        annotations = infos['labelData']['result']
+        if 'standardData' in infos.keys():
+            annotations = infos['standardData']
+        elif 'labelData' in infos.keys():
+            annotations = infos['labelData']['result']
         # frame_id timestamp x y z qx qy qz qw
         pose = infos['poses']['velodyne_points']
         timestamp = infos['frameTimestamp']
@@ -250,26 +260,30 @@ class AICV2KITTI(object):
             alpha = -10
             bounding_box = [0, 0, 100, 100]
 
-            length = size[0]
-            width = size[1]
-            height = size[2]
+            l = size[0]
+            w = size[1]
+            h = size[2]
             x = position['x'] * self.rotate_matrix[0, 0] + \
                 position['y'] * self.rotate_matrix[1, 0]
             y = position['x'] * self.rotate_matrix[0, 1] + \
                 position['y'] * self.rotate_matrix[1, 1]
-            z = position['z'] - height / 2
+            z = position['z'] - h / 2
             rotation_y = rotation['phi']
             if self.enable_rotate_45degree:
                 rotation_y += np.pi / 4
             if rotation_y > np.pi:
                 rotation_y -= 2 * np.pi
+
+            # if self.clean_data(type, l, w, h):
+            #     continue
+
             # [w, h, l] will transfose to [l, w, h] in get_label_anno() of kitti_data_utils.py
             line = type + \
                 ' {} {} {} {} {} {} {} {} {} {} {} {} {} {}\n'.format(
                     round(truncated, 2), occluded, round(alpha, 2),
                     round(bounding_box[0], 2), round(bounding_box[1], 2),
                     round(bounding_box[2], 2), round(bounding_box[3], 2),
-                    round(width, 2), round(height, 2), round(length, 2),
+                    round(w, 2), round(h, 2), round(l, 2),
                     round(x, 2), round(y, 2), round(z, 2),
                     round(rotation_y, 2))
 
@@ -298,6 +312,25 @@ class AICV2KITTI(object):
     def save_pose(self, pose, frame_idx):
         with open(osp.join(f'{self.pose_save_dir}/{str(frame_idx).zfill(6)}.txt'), 'w') as f:
             f.write(pose)
+
+    def clean_data(self, type, l, w, h):
+        """
+        clean data according to anchor_size, the up and down ratio is 4 and 0.25
+        """
+        if type == 'Car' and (
+            l > 17.8 or w > 7.68 or h > 6.6 or l < 1.1 or w < 0.48 or h < 0.1):
+            return True
+        elif type == 'Pedestrian' and (
+            l > 2.2 or w > 2.4 or h > 6.6 or l < 0.14 or w < 0.15 or h < 0.1):
+            return True
+        elif type == 'Bicycle' and (
+            l > 7.4 or w > 3.24 or h > 5.2 or l < 0.46 or w < 0.2 or h < 0.3):
+            return True
+        elif type == 'TrafficCone' and (
+            l > 1.44 or w > 1.44 or h > 2.6 or l < 0.09 or w < 0.09 or h < 0.16):
+            return True
+        else:
+            return False
 
     def create_folder(self):
         """Create folder for data preprocessing."""
@@ -400,7 +433,7 @@ def create_aicv_info_file(data_path,
         relative_path (bool, optional): Whether to use relative path.
             Default: True.
         max_sweeps (int, optional): Max sweeps before the detection frame
-            to be used. Default: 5.
+            to be used. Default: 0.
     """
     imageset_folder = Path(data_path) / 'ImageSets'
     train_img_ids = _read_imageset_file(str(imageset_folder / 'train.txt'))
@@ -429,15 +462,15 @@ def create_aicv_info_file(data_path,
     aicv_infos_train = aicv_infos_gatherer.gather(train_img_ids)
     num_points_in_gt_calculater.calculate(aicv_infos_train)
     filename = save_path / f'{pkl_prefix}_infos_train.pkl'
-    print(f'Waymo info train file is saved to {filename}')
+    print(f'Aicv info train file is saved to {filename}')
     mmcv.dump(aicv_infos_train, filename)
     aicv_infos_val = aicv_infos_gatherer.gather(val_img_ids)
     num_points_in_gt_calculater.calculate(aicv_infos_val)
     filename = save_path / f'{pkl_prefix}_infos_val.pkl'
-    print(f'Waymo info val file is saved to {filename}')
+    print(f'Aicv info val file is saved to {filename}')
     mmcv.dump(aicv_infos_val, filename)
     filename = save_path / f'{pkl_prefix}_infos_trainval.pkl'
-    print(f'Waymo info trainval file is saved to {filename}')
+    print(f'Aicv info trainval file is saved to {filename}')
     mmcv.dump(aicv_infos_train + aicv_infos_val, filename)
 
 

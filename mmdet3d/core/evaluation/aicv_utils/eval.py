@@ -63,7 +63,8 @@ def clean_data(gt_anno, dt_anno, current_class, difficulty):
         dc_bboxes: don't care的box
     """
     CLASS_NAMES = [
-        'Car', 'Cyclist', 'Pedestrian', 'NonMot', 'TrafficCone', 'Others'
+        'Car', 'Bus', 'Bicycle', 'Cyclist', 'Pedestrian', 'TrafficCone', 
+        'Barrier', 'Others'
     ]
     MIN_HEIGHT = [40, 25, 25]           # 最小高度阈值
     MAX_OCCLUSION = [0, 1, 2]           # 最大遮挡阈值
@@ -722,21 +723,23 @@ def aicv_eval(gt_annos,
     assert len(eval_types) > 0, 'must contain at least one evaluation type'
     if 'aos' in eval_types:
         assert 'bbox' in eval_types, 'must evaluate bbox when evaluating aos'
-    overlap_0_7 = np.array([[0.70, 0.50, 0.50, 0.50, 0.50, 0.50],
-                            [0.70, 0.50, 0.50, 0.50, 0.50, 0.50],
-                            [0.70, 0.50, 0.50, 0.50, 0.50, 0.50]])
-    overlap_0_5 = np.array([[0.50, 0.25, 0.25, 0.25, 0.25, 0.25],
-                            [0.50, 0.25, 0.25, 0.25, 0.25, 0.25],
-                            [0.50, 0.25, 0.25, 0.25, 0.25, 0.25]])
-    # 2 overlaps; 3 metrics: [bbox, bev, 3d]; 6 classes
-    min_overlaps = np.stack([overlap_0_7, overlap_0_5], axis=0)  # [2, 3, 6]
+    overlap_0_7 = np.array([[0.70, 0.70, 0.50, 0.50, 0.50, 0.50, 0.50, 0.50],
+                            [0.70, 0.70, 0.50, 0.50, 0.50, 0.50, 0.50, 0.50],
+                            [0.70, 0.70, 0.50, 0.50, 0.50, 0.50, 0.50, 0.50]])
+    overlap_0_5 = np.array([[0.50, 0.50, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25],
+                            [0.50, 0.50, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25],
+                            [0.50, 0.50, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25]])
+    # 2 overlaps; 3 metrics: [bbox, bev, 3d]; 8 classes
+    min_overlaps = np.stack([overlap_0_7, overlap_0_5], axis=0)  # [2, 3, 8]
     class_to_name = {
         0: 'Car',
-        1: 'Cyclist',
-        2: 'Pedestrian',
-        3: 'NonMot',
-        4: 'TrafficCone',
-        5: 'Others',
+        1: 'Bus',
+        2: 'Bicycle',
+        3: 'Cyclist',
+        4: 'Pedestrian',
+        5: 'TrafficCone',
+        6: 'Barrier',
+        7: 'Others',
     }
     name_to_class = {v: n for n, v in class_to_name.items()}
     if not isinstance(current_classes, (list, tuple)):

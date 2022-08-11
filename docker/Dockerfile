@@ -27,5 +27,5 @@ COPY . /mmdetection3d
 WORKDIR /mmdetection3d
 ENV FORCE_CUDA="1"
 RUN pip install -r requirements/build.txt
-RUN pip install -r requirements/optinal.txt
+RUN pip install -r requirements/optional.txt
 RUN pip install --no-cache-dir -e .

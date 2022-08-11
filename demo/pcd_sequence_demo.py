@@ -28,12 +28,15 @@ def main():
         '--snapshot',
         action='store_true',
         help='whether to save online visualization results')
+    parser.add_argument(
+        '--non-blocking',
+        action='store_true',
+        help='whether to do non-blocking visualization')
     args = parser.parse_args()
 
     # build the model from a config file and a checkpoint file
     model = init_model(args.config, args.checkpoint, device=args.device)
     
-    non_blocking = False
     pcd_list = []
     if osp.isdir(args.pcd):
         for path, dir_list, file_list in os.walk(osp.abspath(args.pcd)):
@@ -41,7 +44,6 @@ def main():
                 pcd_file = osp.join(path, file_name)
                 if ".bin" in pcd_file:
                     pcd_list.append(pcd_file)
-        non_blocking = True
     elif osp.isfile(args.pcd):
         pcd_list.append(args.pcd)
     pcd_list.sort()
@@ -55,14 +57,16 @@ def main():
                     label_list.append(label_file)
         elif osp.isfile(args.label):
             label_list.append(args.label)
+    label_list.sort()
 
     # init visualizer
     vis = None
-    if non_blocking:
+    if osp.isdir(args.pcd) and args.non_blocking:
         from mmdet3d.core.visualizer.open3d_vis import Visualizer
         vis = Visualizer(None)
 
     for i in range(len(pcd_list)):
+        print(pcd_list[i])
         # test a single image
         result, data = inference_detector(model, pcd_list[i])
         gt_bboxes = None

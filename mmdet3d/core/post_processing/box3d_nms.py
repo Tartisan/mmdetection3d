@@ -4,8 +4,6 @@ import numpy as np
 import torch
 from mmcv.ops import nms, nms_rotated
 
-from ..bbox import xywhr2xyxyr
-
 
 def box3d_multiclass_nms(mlvl_bboxes,
                          mlvl_bboxes_for_nms,
@@ -18,7 +16,6 @@ def box3d_multiclass_nms(mlvl_bboxes,
                          mlvl_bboxes2d=None):
     """Multi-class NMS for 3D boxes. The IoU used for NMS is defined as the 2D
     IoU between BEV boxes.
-
     Args:
         mlvl_bboxes (torch.Tensor): Multi-level boxes with shape (N, M).
             M is the dimensions of boxes.
@@ -37,7 +34,6 @@ def box3d_multiclass_nms(mlvl_bboxes,
             of attribute classifier. Defaults to None.
         mlvl_bboxes2d (torch.Tensor, optional): Multi-level 2D bounding
             boxes. Defaults to None.
-
     Returns:
         tuple[torch.Tensor]: Return results after nms, including 3D
             bounding boxes, scores, labels, direction scores, attribute
@@ -132,13 +128,11 @@ def box3d_multiclass_nms(mlvl_bboxes,
 
 def aligned_3d_nms(boxes, scores, classes, thresh):
     """3D NMS for aligned boxes.
-
     Args:
         boxes (torch.Tensor): Aligned box with shape [n, 6].
         scores (torch.Tensor): Scores of each box.
         classes (torch.Tensor): Class of each box.
         thresh (float): IoU threshold for nms.
-
     Returns:
         torch.Tensor: Indices of selected boxes.
     """
@@ -183,17 +177,14 @@ def aligned_3d_nms(boxes, scores, classes, thresh):
 @numba.jit(nopython=True)
 def circle_nms(dets, thresh, post_max_size=83):
     """Circular NMS.
-
     An object is only counted as positive if no other center
     with a higher confidence exists within a radius r using a
     bird-eye view distance metric.
-
     Args:
         dets (torch.Tensor): Detection results with the shape of [N, 3].
         thresh (float): Value of threshold.
         post_max_size (int, optional): Max number of prediction to be kept.
             Defaults to 83.
-
     Returns:
         torch.Tensor: Indexes of the detections to be kept.
     """
@@ -235,7 +226,6 @@ def nms_bev(boxes, scores, thresh, pre_max_size=None, post_max_size=None):
     boxes for IoU calculation is defined as the exact overlapping area of the
     two boxes. In this function, one can also set ``pre_max_size`` and
     ``post_max_size``.
-
     Args:
         boxes (torch.Tensor): Input boxes with the shape of [N, 5]
             ([x1, y1, x2, y2, ry]).
@@ -245,7 +235,6 @@ def nms_bev(boxes, scores, thresh, pre_max_size=None, post_max_size=None):
             Default: None.
         post_max_size (int, optional): Max size of boxes after NMS.
             Default: None.
-
     Returns:
         torch.Tensor: Indexes after NMS.
     """
@@ -254,6 +243,8 @@ def nms_bev(boxes, scores, thresh, pre_max_size=None, post_max_size=None):
     if pre_max_size is not None:
         order = order[:pre_max_size]
     boxes = boxes[order].contiguous()
+    scores = scores[order]
+
     # xyxyr -> back to xywhr
     # note: better skip this step before nms_bev call in the future
     boxes = torch.stack(
@@ -262,6 +253,7 @@ def nms_bev(boxes, scores, thresh, pre_max_size=None, post_max_size=None):
         dim=-1)
 
     keep = nms_rotated(boxes, scores, thresh)[1]
+    keep = order[keep]
     if post_max_size is not None:
         keep = keep[:post_max_size]
     return keep
@@ -274,14 +266,12 @@ def nms_normal_bev(boxes, scores, thresh):
     """Normal NMS function GPU implementation (for BEV boxes). The overlap of
     two boxes for IoU calculation is defined as the exact overlapping area of
     the two boxes WITH their yaw angle set to 0.
-
     Args:
         boxes (torch.Tensor): Input boxes with shape (N, 5).
         scores (torch.Tensor): Scores of predicted boxes with shape (N).
         thresh (float): Overlap threshold of NMS.
-
     Returns:
         torch.Tensor: Remaining indices with scores in descending order.
     """
     assert boxes.shape[1] == 5, 'Input boxes shape should be [N, 5]'
-    return nms(xywhr2xyxyr(boxes)[:, :-1], scores, thresh)[1]
+    return nms(boxes[:, :-1], scores, thresh)[1]

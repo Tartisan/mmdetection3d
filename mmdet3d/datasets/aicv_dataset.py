@@ -52,9 +52,13 @@ class AicvDataset(Custom3DDataset):
             Defaults to False.
         pcd_limit_range (list, optional): The range of point cloud used to
             filter invalid predicted boxes.
-            Default: [-85, -85, -5, 85, 85, 5].
+            Default: [-80, -80, -3, 80, 80, 3].
     """
-    CLASSES = ('Car', 'Cyclist', 'Pedestrian', 'NonMot', 'TrafficCone', 'Others')
+    # CLASSES = ('Car', 'Bus', 'Bicycle', 'Cyclist', 'Pedestrian', 'TrafficCone', 
+    #            'Barrier', 'Others')
+    # CLASSES = ('Car', 'Cyclist', 'Pedestrian', 'TrafficCone', 'Bicycle', 'Barrier')
+    # CLASSES = ('Car', 'Pedestrian', 'Bicycle', 'TrafficCone', 'Barrier')
+    CLASSES = ('Car', 'Pedestrian', 'Bicycle', 'TrafficCone')
 
     def __init__(self,
                  data_root,
@@ -67,7 +71,7 @@ class AicvDataset(Custom3DDataset):
                  box_type_3d='LiDAR',
                  filter_empty_gt=True,
                  test_mode=False,
-                 pcd_limit_range=[-85, -85, -5, 85, 85, 5],
+                 pcd_limit_range=[-80, -80, -3, 80, 80, 3],
                  use_valid_flag=False, 
                  **kwargs):
         super().__init__(
@@ -565,7 +569,7 @@ class AicvDataset(Custom3DDataset):
             pipeline.insert(0, dict(type='LoadImageFromFile'))
         return Compose(pipeline)
 
-    def show(self, results, out_dir, show=True, pipeline=None):
+    def show(self, results, out_dir, show=True, non_blocking=False, pipeline=None):
         """Results visualization.
 
         Args:
@@ -578,6 +582,10 @@ class AicvDataset(Custom3DDataset):
         """
         assert out_dir is not None, 'Expect out_dir, got none.'
         pipeline = self._get_pipeline(pipeline)
+        vis = None
+        if non_blocking:
+            from mmdet3d.core.visualizer.open3d_vis import Visualizer
+            vis = Visualizer(None)
         for i, result in enumerate(results):
             if 'pts_bbox' in result.keys():
                 result = result['pts_bbox']
@@ -588,16 +596,27 @@ class AicvDataset(Custom3DDataset):
                 i, pipeline, ['points', 'img_metas', 'img'])
             points = points.numpy()
             # for now we convert points into depth mode
-            points = Coord3DMode.convert_point(points, Coord3DMode.LIDAR,
-                                               Coord3DMode.DEPTH)
+            # points = Coord3DMode.convert_point(points, Coord3DMode.LIDAR,
+            #                                    Coord3DMode.DEPTH)
             gt_bboxes = self.get_ann_info(i)['gt_bboxes_3d'].tensor.numpy()
-            show_gt_bboxes = Box3DMode.convert(gt_bboxes, Box3DMode.LIDAR,
-                                               Box3DMode.DEPTH)
-            pred_bboxes = result['boxes_3d'].tensor.numpy()
-            show_pred_bboxes = Box3DMode.convert(pred_bboxes, Box3DMode.LIDAR,
-                                                 Box3DMode.DEPTH)
-            show_result(points, show_gt_bboxes, show_pred_bboxes, out_dir,
-                        file_name, show)
+            # show_gt_bboxes = Box3DMode.convert(gt_bboxes, Box3DMode.LIDAR,
+            #                                    Box3DMode.DEPTH)
+            pred_bboxes = result['boxes_3d'].tensor.numpy()[:, :7]
+            pred_labels = result['labels_3d'].numpy()
+            # show_pred_bboxes = Box3DMode.convert(pred_bboxes, Box3DMode.LIDAR,
+            #                                      Box3DMode.DEPTH)
+            print('{} pred_bboxes: {}, gt_bboxes: {}'.format(
+                pts_path, pred_bboxes.shape[0], gt_bboxes.shape[0]))
+
+            show_result(points, 
+                        gt_bboxes, 
+                        pred_bboxes, 
+                        out_dir,
+                        file_name, 
+                        show, 
+                        snapshot=True, 
+                        pred_labels=pred_labels, 
+                        visualizer=vis)
 
             # multi-modality visualization
             if self.modality['use_camera'] and 'lidar2img' in img_metas.keys():

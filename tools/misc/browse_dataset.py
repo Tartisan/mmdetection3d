@@ -114,8 +114,8 @@ def show_det_data(input, out_dir, show=False, visualizer=None):
     points = input['points']._data.numpy()
     gt_bboxes = input['gt_bboxes_3d']._data.tensor
     gt_labels = input['gt_labels_3d']._data.numpy()
-    if img_metas['box_mode_3d'] != Box3DMode.DEPTH:
-        points, gt_bboxes = to_depth_mode(points, gt_bboxes)
+    # if img_metas['box_mode_3d'] != Box3DMode.DEPTH:
+    #     points, gt_bboxes = to_depth_mode(points, gt_bboxes)
     filename = osp.splitext(osp.basename(img_metas['pts_filename']))[0]
     show_result(
         points,

@@ -10,12 +10,15 @@ from .image_vis import (draw_camera_bbox3d_on_img, draw_depth_bbox3d_on_img,
 
 
 # http://www1.ynao.ac.cn/~jinhuahe/know_base/othertopics/computerissues/RGB_colortable.htm
-PALETTE = [[0, 0, 255],     # 蓝色
+PALETTE = [[30, 144, 255],  # dodger blue
            [0, 255, 255],   # 青色
-           [255, 153, 18],  # 镉黄
-           [255, 0, 255],   # 深红
-           [255, 192, 203], # 粉红
+           [255, 215, 0],   # 金黄色
+           [255, 0, 0],     # 红色
+           [160, 32, 240],  # 紫色
+           [3, 168, 158],   # 锰蓝
+           [0, 0, 0],       # 黑色
            [255, 97, 0],    # 橙色
+           [0, 201, 87],    # 翠绿色
            [255, 187, 120],
            [188, 189, 34],
            [140, 86, 75],
@@ -137,6 +140,9 @@ def show_result(points,
             vis.o3d_visualizer.clear_geometries()
             vis.add_points(points)
         
+        if gt_bboxes is not None:
+            vis.add_bboxes(bbox3d=gt_bboxes, bbox_color=(0, 1, 0), 
+                           points_in_box_color=(0.5, 0.5, 0.5))
         if pred_bboxes is not None:
             if pred_labels is None:
                 vis.add_bboxes(bbox3d=pred_bboxes)
@@ -150,23 +156,24 @@ def show_result(points,
                         labelDict[i] = []
                     labelDict[i].append(pred_bboxes[j])
                 for i in labelDict:
+                    palette = [c / 255.0 for c in PALETTE[i]]
                     vis.add_bboxes(
                         bbox3d=np.array(labelDict[i]),
-                        bbox_color=[c / 255.0 for c in PALETTE[i]])
+                        bbox_color=palette, 
+                        points_in_box_color=palette)
 
-        if gt_bboxes is not None:
-            vis.add_bboxes(bbox3d=gt_bboxes, bbox_color=(0, 1, 0))
         show_path = osp.join(result_path,
-                             f'{filename}_online.png') if snapshot else None
+                             f'{filename}.png') if snapshot else None
         
+        ctr = vis.o3d_visualizer.get_view_control()
+        ctr.set_lookat([0,0,0])
+        ctr.set_front([-1,-1,1])    # 设置垂直指向屏幕外的向量
+        ctr.set_up([0,0,1])         # 设置指向屏幕上方的向量
+        ctr.set_zoom(0.2)
+
         if visualizer is None:
             vis.show(show_path)
         else:
-            ctr = vis.o3d_visualizer.get_view_control()
-            ctr.set_lookat([0,0,0])
-            ctr.set_front([-1,-1,1])    # 设置垂直指向屏幕外的向量
-            ctr.set_up([0,0,1])         # 设置指向屏幕上方的向量
-            ctr.set_zoom(0.1)
             vis.o3d_visualizer.poll_events()
             vis.o3d_visualizer.update_renderer()
             if show_path is not None:

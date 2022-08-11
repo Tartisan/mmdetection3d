@@ -147,8 +147,12 @@ def inference_detector(model, pcd):
         data['img_metas'] = data['img_metas'][0].data
         data['points'] = data['points'][0].data
     # forward the model
+    import time
     with torch.no_grad():
+        tic = time.perf_counter()
         result = model(return_loss=False, rescale=True, **data)
+        toc = time.perf_counter()
+        print('time cost {:.2f}ms'.format((toc-tic)*1000))
     return result, data
 
 
@@ -339,7 +343,7 @@ def show_det_result_meshlab(data,
     file_name = osp.split(pts_filename)[-1].split('.')[0]
 
     if 'pts_bbox' in result[0].keys():
-        pred_bboxes = result[0]['pts_bbox']['boxes_3d'].tensor.numpy()
+        pred_bboxes = result[0]['pts_bbox']['boxes_3d'].tensor.numpy()[:, :7]
         pred_scores = result[0]['pts_bbox']['scores_3d'].numpy()
         pred_labels = result[0]['pts_bbox']['labels_3d'].numpy()
     else:
@@ -351,19 +355,30 @@ def show_det_result_meshlab(data,
     if score_thr > 0:
         inds = pred_scores > score_thr
         pred_bboxes = pred_bboxes[inds]
+        pred_scores = pred_scores[inds]
         pred_labels = pred_labels[inds]
+
+
+    pred_result = np.concatenate((pred_bboxes, pred_labels.reshape(-1, 1), 
+                                  pred_scores.reshape(-1, 1)), axis=1)
+    mmcv.mkdir_or_exist(out_dir)
+    # np.savetxt(osp.join(out_dir, f'{file_name}.txt'), pred_result, 
+    #            fmt="%.2f, %.2f, %.2f, %.2f, %.2f, %.2f, %.2f, %d, %.2f")
 
     # for now we convert points into depth mode
     box_mode = data['img_metas'][0][0]['box_mode_3d']
-    if box_mode != Box3DMode.DEPTH:
-        points = Coord3DMode.convert(points, box_mode, Coord3DMode.DEPTH)
-        show_bboxes = Box3DMode.convert(pred_bboxes, box_mode, Box3DMode.DEPTH)
-    else:
-        show_bboxes = deepcopy(pred_bboxes)
+    # if box_mode != Box3DMode.DEPTH:
+    #     points = Coord3DMode.convert(points, box_mode, Coord3DMode.DEPTH)
+    #     show_bboxes = Box3DMode.convert(pred_bboxes, box_mode, Box3DMode.DEPTH)
+    # else:
+    #     show_bboxes = deepcopy(pred_bboxes)
 
-    gt_bboxes = None
-    if gt is not None:
-        gt_bboxes = Box3DMode.convert(gt, box_mode, Box3DMode.DEPTH)
+    # gt_bboxes = None
+    # if gt is not None:
+    #     gt_bboxes = Box3DMode.convert(gt, box_mode, Box3DMode.DEPTH)
+
+    show_bboxes = deepcopy(pred_bboxes)
+    gt_bboxes = deepcopy(gt)
 
     show_result(
         points,

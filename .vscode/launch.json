@@ -1,0 +1,96 @@
+{
+  // 使用 IntelliSense 了解相关属性。 
+  // 悬停以查看现有属性的描述。
+  // 欲了解更多信息，请访问: https://go.microsoft.com/fwlink/?linkid=830387
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Python: 当前文件",
+      "type": "python",
+      "request": "launch",
+      "program": "${file}",
+      "console": "integratedTerminal",
+      "justMyCode": true,
+      /// visualize_results.py
+      // "args": ["configs/centerpoint/centerpoint_02pillar_second_secfpn_cyclic_hesai40-bp-4class-80m.py", 
+      //          "--result", "work_dirs/evaluation/results_hesai40-bp-4class-80m-3tasks_56e.pkl", "--non-blocking"]
+      // "args": ["configs/centerpoint/centerpoint_02pillar_second_secfpn_cyclic_hesai90-4class-80m.py", 
+      //          "--result", "work_dirs/evaluation/centerpoint_hesai90-4class-80m-3tasks_80e.pkl", "--non-blocking"]
+
+      /// browse_dataset.py
+      // "args": ["configs/_base_/datasets/hesai40-bp-3d-8class-80m.py", "--task", "det", "--aug",
+      //          "--output-dir", "work_dirs/browse_datasets/hesai40-bp", 
+      //          "--online"]
+      // "args": ["configs/_base_/datasets/hesai40-3d-4class-80m.py", "--task", "det",
+      //          "--output-dir", "work_dirs/browse_datasets/hesai40-toyota-update-4class", 
+      //          "--online"]
+
+      /// analyze_logs.py
+      // "args": ["plot_curve", "work_dirs/pointpillars_hesai40-bp-3d-voxel0.2-rotate0/20220623_195025.log.json", 
+      //          "--keys", "loss_cls", "loss_bbox", "loss_dir", "loss", 
+      //          "--legend", "loss_cls", "loss_bbox", "loss_dir", "loss"],
+
+      /// test.py
+      // "args": ["configs/pointpillars/hv_pointpillars_secfpn_sbn_hesai40-bp-3d-8class-80m.py", 
+      //          "work_dirs/0705-pointpillars_secfpn_sbn_hesai40-3d-8class_80m/pp_8class_voxel0.25_80m_22e.pth", 
+      //          "--eval", "mAP"]
+      // "args": ["configs/pointpillars/hv_pointpillars_secfpn_sbn_2x16_2x_hesai90-3d-3class.py", 
+      //          "work_dirs/0611-pointpillars_secfpn_sbn_hesai40-3d-3class-84e/epoch_84.pth", "--eval", "mAP"]
+
+      /// create_data.py
+      // "args": ["kitti", "--root-path", "./data/kitti", "--out-dir", "./data/kitti", "--extra-tag", "kitti"]
+      // "args": ["aicv", "--root-path", "./data/hesai40/toyota-update", "--out-dir", "./data/hesai40/toyota-update", "--extra-tag", "toyota-update", "--workers", "32"]
+
+      /// trans_backbone.py
+      // "args": ["data/hesai40/mb-bp/kitti_format/training/velodyne/000022.bin", 
+      //          "configs/pointpillars/hv_pointpillars_secfpn_sbn_hesai40-3d-3class.py", 
+      //          "work_dirs/0611-pointpillars_secfpn_sbn_hesai40-3d-3class-84e/epoch_84.pth"]
+      "args": ["data/hesai40/mb-bp/kitti_format/training/velodyne/000022.bin", 
+               "configs/centerpoint/centerpoint_02pillar_second_secfpn_cyclic_hesai40-4class-80m.py", 
+               "work_dirs/0804-centerpoint_02pillar_second_secfpn_cyclic_hesai40-4class-80m/cp_pillar02_80m_mb-bp_40e07.pth"]
+      // "args": ["data/hesai90/kitti_format/training/velodyne/001335.bin", 
+      //          "configs/centerpoint/centerpoint_02pillar_second_secfpn_cyclic_hesai90-4class-80m.py", 
+      //          "work_dirs/0719-centerpoint_02pillar_second_secfpn_cyclic_hesai90-4class-80m/cp_pillar02_hesai90_80m_80e.pth"]
+
+      /// train.py 
+      // "args": ["configs/centerpoint/centerpoint_02pillar_second_secfpn_4x8_cyclic_20e_hesai40-bp.py"]
+      // "args": ["configs/pointpillars/hv_pointpillars_fpn_sbn_all_2x8_2x_hesai40-bp-3d.py"]
+
+      /// pcd_sequence_demo.py
+      // "args": ["data/hesai40-bp/kitti_format/training/velodyne/000005.bin", 
+      //          "configs/centerpoint/centerpoint_02pillar_second_secfpn_cyclic_hesai40-bp-4class-80m.py", 
+      //          "work_dirs/0718-centerpoint_02pillar_second_secfpn_cyclic_hesai40-bp-80m-3tasks/epoch_56.pth",
+      //         //  "--label", "work_dirs/000005.txt", 
+      //          "--show", "--score-thr", "0.1"]
+      // "args": ["data/hesai40/kitti_format/training/velodyne/000004.bin", 
+      //          "configs/centerpoint/centerpoint_02pillar_second_secfpn_cyclic_hesai40-4class-80m.py", 
+      //          "work_dirs/0721-centerpoint_02pillar_second_secfpn_cyclic_hesai40-4class-80m/epoch_12.pth",
+      //         //  "--label", "data/hesai90/kitti_format/training/label/000235.txt", 
+      //          "--show", "--score-thr", "0.1"]
+      // "args": ["data/hesai90/kitti_format/training/velodyne/001335.bin", 
+      //          "configs/pointpillars/hv_pointpillars_secfpn_sbn_hesai90-3d-4class-80m.py", 
+      //          "work_dirs/0714-pointpillars_secfpn_sbn_hesai90-3d-4class_80m/epoch_120.pth", 
+      //         //  "--label", "data/hesai90/kitti_format/training/label",
+      //          "--show", "--score-thr", "0.1", "--snapshot", "--non-blocking"]
+      // "args": ["/media/Data/bag/bus/BUS2003_default_0_20220523100354_20220523100407/0006.bin", 
+      //          "configs/pointpillars/hv_pointpillars_secfpn_sbn_hesai40-bp-3d-6class-60m.py", 
+      //          "work_dirs/pointpillars_secfpn_sbn_hesai40-bp-3d-voxel0.2-rotate45/epoch_60.pth", 
+      //          "--show", "--score-thr", "0.2", "--snapshot"]
+      // "args": ["configs/pointpillars/hv_pointpillars_secfpn_sbn_2x16_2x_hesai40-bp-3d-3class.py", 
+      //          "work_dirs/pointpillars_hesai40-bp-3d-3class/epoch_28.pth", "--show", 
+      //          "--show-dir", "work_dirs/pointpillars_hesai40-bp-3d-3class"]
+      // "args": ["data/waymo/kitti_format/testing/velodyne/2014008.bin", 
+      //          "configs/pointpillars/hv_pointpillars_secfpn_sbn_2x16_2x_waymoD5-3d-3class.py", 
+      //          "work_dirs/pointpillars_waymoD10-3d-3class-dim4/epoch_18.pth", "--show", "--score-thr", "0.2"]
+      // "args": ["data/apolloscape/testing/tracking_test_pcd_2/result_9057_7_frame/467.bin", 
+      //          "configs/pointpillars/hv_pointpillars_secfpn_sbn_2x16_2x_hesai40-bp-3d-3class.py", 
+      //          "work_dirs/pointpillars_waymoD10-3d-3class-dim4/epoch_18.pth", "--score-thr", "0.3", "--show"]
+      // "args": ["demo/data/kitti/kitti_000008.bin", 
+      //          "configs/pointpillars/hv_pointpillars_secfpn_6x8_160e_kitti-3d-3class.py", 
+      //          "checkpoints/pointpillars/hv_pointpillars_secfpn_6x8_160e_kitti-3d-3class_20220301_150306-37dc2420.pth", "--show"]
+      // "args": ["data/nuscenes/v1.0-mini/samples/LIDAR_TOP/n008-2018-08-27-11-48-51-0400__LIDAR_TOP__1535385092700299.pcd.bin", 
+      //          "configs/pointpillars/hv_pointpillars_secfpn_sbn-all_4x8_2x_nus-3d.py", 
+      //          "checkpoints/pointpillars/hv_pointpillars_secfpn_sbn-all_4x8_2x_nus-3d_20210826_225857-f19d00a3.pth", "--show"]
+    }
+  ]
+}
