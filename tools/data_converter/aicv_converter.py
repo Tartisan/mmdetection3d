@@ -1,6 +1,7 @@
 # Copyright (c) OpenMMLab. All rights reserved.
 import os
 import os.path as osp
+from functools import cmp_to_key
 from pathlib import Path
 from concurrent import futures as futures
 import random
@@ -26,17 +27,24 @@ def _read_file(path):
 def _read_result(path):
     relative_paths = []
     label_infos = []
+    tmp_paths = []
     with open(path, 'r') as f:
         lines = f.readlines()
         for line in lines[1:]:
             infos = json.loads(line.split('\t')[1])
             if 'labelData' not in infos.keys() and 'standardData' not in infos.keys():
                 continue
-            relative_paths.append(infos['datasetsRelatedFiles'][0]['localRelativePath'])
+            relative_path = infos['datasetsRelatedFiles'][0]['localRelativePath']
+            relative_paths.append(relative_path)
+            tmp_paths.append('files/' + relative_path.split('/')[1] + '/' + 
+                             relative_path.split('/')[2].zfill(8))
             label_infos.append(infos)
 
-    sorted_index = argsort(relative_paths)
-    _write_imageset_file(path.split('result')[0] + 'pcd.txt', relative_paths)
+    # sorted_index = argsort(relative_paths)
+    # _write_sort_file(path.split('result')[0] + 'pcd.txt', relative_paths)
+    sorted_index = argsort(tmp_paths)
+    tmp_paths = [relative_paths[i] for i in sorted_index]
+    _write_raw_file(path.split('result')[0] + 'pcd.txt', tmp_paths)
     return [label_infos[i] for i in sorted_index]
 
 
@@ -47,7 +55,7 @@ def _split_imageset(imageset_dir, frame_num):
        osp.exists(osp.join(imageset_dir, 'train.txt')) and \
        osp.exists(osp.join(imageset_dir, 'val.txt')):
        return
-    _write_imageset_file(osp.join(imageset_dir, 'trainval.txt'), trainval_idx)
+    _write_sort_file(osp.join(imageset_dir, 'trainval.txt'), trainval_idx)
 
     random.shuffle(trainval_idx)
     total = len(trainval_idx)
@@ -57,11 +65,16 @@ def _split_imageset(imageset_dir, frame_num):
 
     train_idx = trainval_idx[0: split]
     val_idx = trainval_idx[split: total]
-    _write_imageset_file(osp.join(imageset_dir, 'train.txt'), train_idx)
-    _write_imageset_file(osp.join(imageset_dir, 'val.txt'), val_idx)
+    _write_sort_file(osp.join(imageset_dir, 'train.txt'), train_idx)
+    _write_sort_file(osp.join(imageset_dir, 'val.txt'), val_idx)
 
 
-def _write_imageset_file(path, split_idx):
+def _write_raw_file(path, split_idx):
+    with open(path, 'w+') as f:
+        for idx in split_idx:
+            f.write(str(idx) + '\n')
+
+def _write_sort_file(path, split_idx):
     split_idx.sort()
     with open(path, 'w+') as f:
         for idx in split_idx:
@@ -143,7 +156,7 @@ class AICV2KITTI(object):
         self.test_mode = test_mode
         self.workers = int(workers)
 
-        self.rotate_matrix = np.eye(4)
+        self.rotate_matrix = np.eye(5)
         if enable_rotate_45degree:
             self.rotate_matrix = np.array(
                 [[np.cos(np.pi/4),  np.sin(np.pi/4), 0, 0, 0], 

@@ -39,7 +39,8 @@
 
       /// create_data.py
       // "args": ["kitti", "--root-path", "./data/kitti", "--out-dir", "./data/kitti", "--extra-tag", "kitti"]
-      // "args": ["aicv", "--root-path", "./data/hesai40/toyota-update", "--out-dir", "./data/hesai40/toyota-update", "--extra-tag", "toyota-update", "--workers", "32"]
+      // "args": ["aicv", "--root-path", "./data/hesai40/mb-bp", "--out-dir", "./data/hesai40/mb-bp", "--extra-tag", "mb-bp", "--workers", "32"]
+      // "args": ["aicv", "--root-path", "./data/hesai90", "--out-dir", "./data/hesai90", "--extra-tag", "hesai90", "--workers", "32"]
 
       /// trans_backbone.py
       // "args": ["data/hesai40/mb-bp/kitti_format/training/velodyne/000022.bin", 
@@ -47,7 +48,7 @@
       //          "work_dirs/0611-pointpillars_secfpn_sbn_hesai40-3d-3class-84e/epoch_84.pth"]
       "args": ["data/hesai40/mb-bp/kitti_format/training/velodyne/000022.bin", 
                "configs/centerpoint/centerpoint_02pillar_second_secfpn_cyclic_hesai40-4class-80m.py", 
-               "work_dirs/0804-centerpoint_02pillar_second_secfpn_cyclic_hesai40-4class-80m/cp_pillar02_80m_mb-bp_40e07.pth"]
+               "work_dirs/0804-centerpoint_02pillar_second_secfpn_cyclic_hesai40-4class-80m/cp_pillar02_80m_mb-bp_40e07.pth", "--show"]
       // "args": ["data/hesai90/kitti_format/training/velodyne/001335.bin", 
       //          "configs/centerpoint/centerpoint_02pillar_second_secfpn_cyclic_hesai90-4class-80m.py", 
       //          "work_dirs/0719-centerpoint_02pillar_second_secfpn_cyclic_hesai90-4class-80m/cp_pillar02_hesai90_80m_80e.pth"]
