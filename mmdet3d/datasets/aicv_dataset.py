@@ -315,6 +315,7 @@ class AicvDataset(Custom3DDataset):
 
     def evaluate(self,
                  results,
+                 plot_pr=False,
                  metric=None,
                  logger=None,
                  pklfile_prefix=None,
@@ -359,7 +360,8 @@ class AicvDataset(Custom3DDataset):
                     gt_annos,
                     result_files_,
                     self.CLASSES,
-                    eval_types=eval_types)
+                    eval_types=eval_types,
+                    plot_pr=plot_pr)
                 for ap_type, ap in ap_dict_.items():
                     ap_dict[f'{name}/{ap_type}'] = float('{:.4f}'.format(ap))
 

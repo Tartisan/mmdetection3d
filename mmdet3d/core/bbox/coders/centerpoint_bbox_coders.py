@@ -43,7 +43,7 @@ class CenterPointBBoxCoder(BaseBBoxCoder):
 
         Args:
             feats (torch.Tensor): Features to be transposed and gathered
-                with the shape of [B, 2, W, H].
+                with the shape of [B, W * H, 2].
             inds (torch.Tensor): Indexes with the shape of [B, N].
             feat_masks (torch.Tensor, optional): Mask of the feats.
                 Default: None.
@@ -51,7 +51,9 @@ class CenterPointBBoxCoder(BaseBBoxCoder):
         Returns:
             torch.Tensor: Gathered feats.
         """
+        # feats 为三维，获取最后维度的尺寸值
         dim = feats.size(2)
+        # inds 为两维，扩展成三维，且最后维度尺寸值跟 feats 相同。expand 采用的是复制的方式扩展
         inds = inds.unsqueeze(2).expand(inds.size(0), inds.size(1), dim)
         feats = feats.gather(1, inds)
         if feat_masks is not None:

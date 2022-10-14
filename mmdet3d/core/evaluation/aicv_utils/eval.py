@@ -4,6 +4,7 @@ import io as sysio
 
 import numba
 import numpy as np
+import matplotlib.pyplot as plt
 
 
 @numba.jit
@@ -682,12 +683,29 @@ def print_str(value, *arg, sstream=None):
     print(value, *arg, file=sstream)
     return sstream.getvalue()
 
+def plot_pr_curves(ret, title):
+    num_class = ret['precision'].shape[0]
+    num_overlaps = ret['precision'].shape[2]
+    linestyle = ['--', '-', '-.']
+    plt.figure()
+    for i in range(num_overlaps):
+        precision = ret['precision'][:, 0, i, :].T
+        x = np.repeat(np.arange(41).reshape(-1, 1), num_class, axis=1) / 40.
+        plt.plot(x, precision, linestyle=linestyle[i])
+        plt.title(title)
+        plt.xlabel('recall')
+        plt.ylabel('precision')
+        plt.gca().set_prop_cycle(None)
+    # plt.legend(['IOU 0.7', 'IOU 0.5'])
+    plt.savefig(f'pr_curves_{title}.png')
+
 
 def do_eval(gt_annos,
             dt_annos,
             current_classes,
             min_overlaps,
-            eval_types=['bev', '3d']):
+            eval_types=['bev', '3d'],
+            plot_pr=False):
     # min_overlaps: [num_minoverlap, metric, num_class]
     difficultys = [1]
     mAP40_bev = None
@@ -695,19 +713,24 @@ def do_eval(gt_annos,
         ret = eval_class(gt_annos, dt_annos, current_classes, difficultys, 1,
                         min_overlaps)
         mAP40_bev = get_mAP40(ret['precision'])
+        if plot_pr:
+            plot_pr_curves(ret, 'bev')
 
     mAP40_3d = None
     if '3d' in eval_types:
         ret = eval_class(gt_annos, dt_annos, current_classes, difficultys, 2,
                         min_overlaps)
         mAP40_3d = get_mAP40(ret['precision'])
+        if plot_pr:
+            plot_pr_curves(ret, '3d')
     return (mAP40_bev, mAP40_3d)
 
 
 def aicv_eval(gt_annos,
               dt_annos,
               current_classes,
-              eval_types=['bev', '3d']):
+              eval_types=['bev', '3d'],
+              plot_pr=False):
     """AICV evaluation.
 
     Args:
@@ -754,7 +777,7 @@ def aicv_eval(gt_annos,
     min_overlaps = min_overlaps[:, :, current_classes]
     result = ''
     mAP40_bev, mAP40_3d = do_eval(gt_annos, dt_annos, current_classes, 
-                                        min_overlaps, eval_types)
+                                  min_overlaps, eval_types, plot_pr)
 
     ret_dict = {}
     difficulty = ['moderate']

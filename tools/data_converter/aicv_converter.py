@@ -167,7 +167,7 @@ class AICV2KITTI(object):
 
         self.label_infos = _read_result(load_dir + f'/result.txt')
 
-        self.imageset_dir = f'{self.save_dir}/kitti_format/ImageSets'
+        self.imageset_dir = f'{self.load_dir}/kitti_format/ImageSets'
         _split_imageset(self.imageset_dir, len(self))
 
         self.label_save_dir = f'{self.save_dir}/label'

@@ -2,7 +2,7 @@
 # D5 in the config name means the whole dataset is divided into 5 folds
 # We only use one fold for efficient experiments
 dataset_type = 'AicvDataset'
-data_root = 'data/hesai40-bp/kitti_format/'
+data_root = 'data/hesai40/mb-bp/kitti_format/'
 file_client_args = dict(backend='disk')
 # Uncomment the following if use ceph or other file clients.
 # See https://mmcv.readthedocs.io/en/latest/api.html#mmcv.fileio.FileClient
@@ -16,7 +16,7 @@ point_cloud_range = [-80, -80, -3, 80, 80, 3]
 input_modality = dict(use_lidar=True, use_camera=False)
 db_sampler = dict(
     data_root=data_root,
-    info_path=data_root + 'hesai40-bp_dbinfos_train.pkl',
+    info_path=data_root + 'mb-bp_dbinfos_train.pkl',
     rate=1.0,
     prepare=dict(
         filter_by_min_points=dict(
@@ -111,7 +111,7 @@ data = dict(
         dataset=dict(
             type=dataset_type,
             data_root=data_root,
-            ann_file=data_root + 'hesai40-bp_infos_train.pkl',
+            ann_file=data_root + 'mb-bp_infos_train.pkl',
             split='training',
             pipeline=train_pipeline,
             modality=input_modality,
@@ -123,7 +123,7 @@ data = dict(
     val=dict(
         type=dataset_type,
         data_root=data_root,
-        ann_file=data_root + 'hesai40-bp_infos_val.pkl',
+        ann_file=data_root + 'mb-bp_infos_val.pkl',
         split='training',
         pipeline=test_pipeline,
         modality=input_modality,
@@ -133,7 +133,7 @@ data = dict(
     test=dict(
         type=dataset_type,
         data_root=data_root,
-        ann_file=data_root + 'hesai40-bp_infos_val.pkl',
+        ann_file=data_root + 'mb-bp_infos_val.pkl',
         split='training',
         pipeline=test_pipeline,
         modality=input_modality,

@@ -86,26 +86,6 @@ with open(osp.join(args.root_path, 'result.txt'), 'r') as f:
 
             if type not in AICV_CLASSES:
                 continue
-
-            # clean data
-            # anchor_size according to hesai90 dataset:
-            # [4.45, 1.92, 1.65], Car
-            # [0.55, 0.60, 1.65], Pedestrian
-            # [1.85, 0.81, 1.30], Bicycle
-            # [0.36, 0.36, 0.65], TrafficCone
-            # elif aicv_to_custom[type] == 'Car' and (
-            #     l > 17.8 or w > 7.68 or h > 6.6 or l < 1.1 or w < 0.48 or h < 0.1):
-            #     count_car += 1
-            # elif aicv_to_custom[type] == 'Pedestrian' and (
-            #     l > 2.2 or w > 2.4 or h > 6.6 or l < 0.14 or w < 0.15 or h < 0.1):
-            #     count_ped += 1
-            # elif aicv_to_custom[type] == 'Bicycle' and (
-            #     l > 7.4 or w > 3.24 or h > 5.2 or l < 0.46 or w < 0.2 or h < 0.3):
-            #     count_bicy += 1
-            # elif aicv_to_custom[type] == 'TrafficCone' and (
-            #     l > 1.44 or w > 1.44 or h > 2.6 or l < 0.09 or w < 0.09 or h < 0.16):
-            #     count_cone += 1
-
             elif aicv_to_custom[type] in CUSTOM_CLASSES:
                 # statistics
                 pd_line = [frame_num, aicv_to_custom[type], l, w, h, bh]

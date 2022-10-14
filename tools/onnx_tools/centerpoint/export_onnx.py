@@ -168,11 +168,6 @@ class Backbone(nn.Module):
         x = self.pts_backbone(x)
         x = self.pts_neck(x)
         outs = self.pts_bbox_head(x)
-        # for task in outs:
-        #     heatmap = torch.sigmoid(task[0]['heatmap'])
-        #     scores, labels = torch.max(heatmap, dim=1)
-        #     task[0]['heatmap'] = (scores, labels)
-        #     task[0]['dim'] = torch.exp(task[0]['dim'])
 
         bbox_preds, scores, dir_scores = [], [], []
         for task_res in outs:
@@ -249,6 +244,7 @@ def load_data(model, pcd):
         data = scatter(data, [device.index])[0]
     else:
         # this is a workaround to avoid the bug of MMDataParallel
+        data['img_metas'] = data['img_metas'][0].data
         data['points'] = data['points'][0].data
     return data
 
@@ -303,6 +299,12 @@ def main():
     parser.add_argument('checkpoint', help='Checkpoint file')
     parser.add_argument(
         '--device', default='cuda:0', help='Device used for inference')
+    parser.add_argument(
+        '--static',
+        action='store_true',
+        help='whether export onnx with dynamic_axes')
+    parser.add_argument(
+        '--show', action='store_true', help='show online visualization results')
     args = parser.parse_args()
 
     if isinstance(args.config, str):
@@ -335,17 +337,20 @@ def main():
     # PillarFeatureNet
     pts_voxel_encoder = build_pfn_model(cfg, args.checkpoint, device=device)
     # max_voxels * 20 * 10
-    voxel_features = torch.ones(cfg.model['pts_voxel_layer']['max_voxels'][1],
-                                cfg.model['pts_voxel_layer']['max_num_points'],
-                                pts_voxel_encoder.in_channels).cuda()
+    dummy_input = torch.ones(cfg.model['pts_voxel_layer']['max_voxels'][1],
+                             cfg.model['pts_voxel_layer']['max_num_points'],
+                             pts_voxel_encoder.in_channels).cuda()
+    dynamic_axes = None if args.static else {'voxels': {0: 'voxel_size'},
+                                             'pillar_feature': {0: 'voxel_size'}}
     torch.onnx.export(pts_voxel_encoder,
-                      voxel_features,
+                      dummy_input,
                       f='./tools/onnx_tools/centerpoint/pfe.onnx',
                       opset_version=12,
                       verbose=True,
                       input_names=['voxels'],
-                      output_names=['voxel_features'],
-                      do_constant_folding=True)
+                      output_names=['pillar_feature'],
+                      do_constant_folding=True,
+                      dynamic_axes=dynamic_axes)
 
     # Backbone
     data = load_data(model, args.pcd)
@@ -362,7 +367,7 @@ def main():
                       f='./tools/onnx_tools/centerpoint/backbone.onnx',
                       opset_version=12,
                       verbose=True,
-                      input_names=['scattered_features'],
+                      input_names=['canvas_feature'],
                       output_names=['scores', 'bbox_preds', 'dir_scores'],
                       do_constant_folding=True)
 
