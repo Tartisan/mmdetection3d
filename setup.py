@@ -224,5 +224,15 @@ if __name__ == '__main__':
             'build': parse_requirements('requirements/build.txt'),
             'optional': parse_requirements('requirements/optional.txt'),
         },
+        ext_modules=[
+            make_cuda_ext(
+                name='voxel_layer',
+                module='mmdet3d.ops.voxel',
+                sources=[
+                    'src/voxelization.cpp',
+                    'src/voxelization_cpu.cpp',
+                    'src/voxelization_cuda.cu',
+                ])
+        ],
         cmdclass={'build_ext': BuildExtension},
         zip_safe=False)
