@@ -222,6 +222,8 @@ class NuScenesDataset(Custom3DDataset):
         if self.modality['use_camera']:
             image_paths = []
             lidar2img_rts = []
+            cam2lidar_rts = []
+            cam_intrinsic = []
             for cam_type, cam_info in info['cams'].items():
                 image_paths.append(cam_info['data_path'])
                 # obtain lidar to image transformation matrix
@@ -236,12 +238,18 @@ class NuScenesDataset(Custom3DDataset):
                 viewpad[:intrinsic.shape[0], :intrinsic.shape[1]] = intrinsic
                 lidar2img_rt = (viewpad @ lidar2cam_rt.T)
                 lidar2img_rts.append(lidar2img_rt)
+                cam_intrinsic.append(cam_info['cam_intrinsic'])
+                cam2lidar_rt = np.eye(4)
+                cam2lidar_rt[:3, :3] = cam_info['sensor2lidar_rotation']
+                cam2lidar_rt[:3, 3] = cam_info['sensor2lidar_translation']
+                cam2lidar_rts.append(cam2lidar_rt)
 
             input_dict.update(
                 dict(
                     img_filename=image_paths,
                     lidar2img=lidar2img_rts,
-                ))
+                    cam_intrinsic=cam_intrinsic,
+                    cam2lidar=cam2lidar_rts))
 
         if not self.test_mode:
             annos = self.get_ann_info(index)
@@ -316,7 +324,7 @@ class NuScenesDataset(Custom3DDataset):
         print('Start to convert detection format...')
         for sample_id, det in enumerate(mmcv.track_iter_progress(results)):
             annos = []
-            boxes = output_to_nusc_box(det)
+            boxes = output_to_nusc_box(det, self.with_velocity)
             sample_token = self.data_infos[sample_id]['token']
             boxes = lidar_nusc_box_to_global(self.data_infos[sample_id], boxes,
                                              mapped_class_names,
@@ -573,7 +581,7 @@ class NuScenesDataset(Custom3DDataset):
                         file_name, show)
 
 
-def output_to_nusc_box(detection):
+def output_to_nusc_box(detection, with_velocity=True):
     """Convert the output to the box class in the nuScenes.
 
     Args:
@@ -600,7 +608,10 @@ def output_to_nusc_box(detection):
     box_list = []
     for i in range(len(box3d)):
         quat = pyquaternion.Quaternion(axis=[0, 0, 1], radians=box_yaw[i])
-        velocity = (*box3d.tensor[i, 7:9], 0.0)
+        if with_velocity:
+            velocity = (*box3d.tensor[i, 7:9], 0.0)
+        else:
+            velocity = (0, 0, 0)
         # velo_val = np.linalg.norm(box3d[i, 7:9])
         # velo_ori = box3d[i, 6]
         # velocity = (

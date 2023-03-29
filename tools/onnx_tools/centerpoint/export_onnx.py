@@ -143,7 +143,7 @@ class PillarFeatureNet(nn.Module):
     @force_fp32(out_fp16=True)
     def forward(self, voxel_features):
         for pfn in self.pfn_layers:
-            voxel_features = pfn(voxel_features)
+            voxel_features = pfn(voxel_features.squeeze(-1))
         return voxel_features.squeeze(1)
 
 
@@ -259,15 +259,13 @@ def build_pfn_model(cfg, checkpoint=None, device='cuda:0'):
         norm_cfg=cfg.model['pts_voxel_encoder']['norm_cfg'],
         legacy=cfg.model['pts_voxel_encoder']['legacy'],)
     pts_voxel_encoder.to(device).eval()
-    checkpoint_pts_load = torch.load(checkpoint, map_location=device)
+    checkpoint = torch.load(checkpoint, map_location=device)
     dicts = {}
-    for key in checkpoint_pts_load['state_dict'].keys():
+    for key in checkpoint['state_dict'].keys():
         if 'pfn' in key:
             dicts[key.split('pts_voxel_encoder.')[1]
-                  ] = checkpoint_pts_load['state_dict'][key]
+                  ] = checkpoint['state_dict'][key]
     pts_voxel_encoder.load_state_dict(dicts)
-    print('-----------------------')
-    parse_model(pts_voxel_encoder)
     return pts_voxel_encoder
 
 
@@ -339,7 +337,7 @@ def main():
     # max_voxels * 20 * 10
     dummy_input = torch.ones(cfg.model['pts_voxel_layer']['max_voxels'][1],
                              cfg.model['pts_voxel_layer']['max_num_points'],
-                             pts_voxel_encoder.in_channels).cuda()
+                             pts_voxel_encoder.in_channels, 1).cuda()
     dynamic_axes = None if args.static else {'voxels': {0: 'voxel_size'},
                                              'pillar_feature': {0: 'voxel_size'}}
     torch.onnx.export(pts_voxel_encoder,

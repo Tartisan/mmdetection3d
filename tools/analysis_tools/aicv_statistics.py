@@ -42,7 +42,7 @@ aicv_to_custom = {
     'others': 'DontCare'
 }
 
-point_cloud_range = [-80, -80, -3, 80, 80, 3]
+point_cloud_range = [-90, -90, -5, 90, 90, 5]
 
 pd_all_classes = {c: [] for c in CUSTOM_CLASSES}
 pd_total = []
@@ -52,23 +52,23 @@ parser.add_argument('root_path', metavar='data/hesai40',
                     help='path of the dataset')
 args = parser.parse_args()
 
-count_car = 0
-count_ped = 0
-count_bicy = 0
-count_cone = 0
-
 frame_num = 0
 with open(osp.join(args.root_path, 'result.txt'), 'r') as f:
     lines = f.readlines()
     for line in lines[1:]:
         infos = json.loads(line.split('\t')[1])
         # 优先使用 standardData(脑补框)
-        if 'standardData' not in infos.keys() and 'labelData' not in infos.keys():
-            continue
-        elif 'standardData' in infos.keys():
+        if 'standardData' in infos.keys():
             annos = infos['standardData']
         elif 'labelData' in infos.keys():
-            annos = infos['labelData']['result']
+            if 'result' in infos['labelData'].keys():
+                annos = infos['labelData']['result']
+            elif 'markData' in infos['labelData'].keys() and 'cube3d' in infos['labelData']['markData'].keys():
+                annos = infos['labelData']['markData']['cube3d']
+            else:
+                continue
+        else:
+            continue
         for anno in annos:
             type = anno['type']
             x = anno['position']['x']
@@ -102,11 +102,6 @@ for k, v in pd_all_classes.items():
 for k, v in pd_all_classes.items():
     print('load {} {},\taverage {:.2f} / frame, ratio {:.2f}%'.format(len(v),
           k, len(v)/frame_num, len(v)*100/total_sample_num))
-print('\n')
-print(count_car)
-print(count_ped)
-print(count_bicy)
-print(count_cone)
 
 # anchor
 sns.set()
@@ -117,12 +112,12 @@ sns.set()
 # fig_hist = plt.figure(figsize=(18, 10))
 # fig_kde_lw = plt.figure(figsize=(18, 10))
 # fig_kde_h = plt.figure(figsize=(18, 10))
-gs = gridspec.GridSpec(2, math.ceil(len(CUSTOM_CLASSES)/2))
-count = 0
-for type, pd_single_class in pd_all_classes.items():
-    data = pd.DataFrame(pd_single_class, columns=[
-                        'index', 'class', 'l', 'w', 'h', 'bottom_h'])
-    print(type, 'dimension statistics:\n', data.describe(), '\n')
+# gs = gridspec.GridSpec(2, math.ceil(len(CUSTOM_CLASSES)/2))
+# count = 0
+# for type, pd_single_class in pd_all_classes.items():
+#     data = pd.DataFrame(pd_single_class, columns=[
+#                         'index', 'class', 'l', 'w', 'h', 'bottom_h'])
+#     print(type, 'dimension statistics:\n', data.describe(), '\n')
 
 #     jg0 = sns.jointplot(x="l", y="w", data=data, marker="+")
 #     sfg.SeabornFig2Grid(jg0, fig_hist, gs[count])

@@ -73,6 +73,8 @@ def parse_args():
     parser.add_argument(
         '--show-dir', help='directory where results will be saved')
     parser.add_argument(
+        '--plot-pr', action='store_true', help='plot precision-recall curves')
+    parser.add_argument(
         '--gpu-collect',
         action='store_true',
         help='whether to use gpu to collect results.')
@@ -236,7 +238,7 @@ def main():
             broadcast_buffers=False)
         outputs = multi_gpu_test(model, data_loader, args.tmpdir,
                                  args.gpu_collect)
-
+    
     rank, _ = get_dist_info()
     if rank == 0:
         if args.out:
@@ -254,7 +256,7 @@ def main():
             ]:
                 eval_kwargs.pop(key, None)
             eval_kwargs.update(dict(metric=args.eval, **kwargs))
-            print(dataset.evaluate(outputs, **eval_kwargs))
+            print(dataset.evaluate(outputs, plot_pr=args.plot_pr, **eval_kwargs))
 
 
 if __name__ == '__main__':

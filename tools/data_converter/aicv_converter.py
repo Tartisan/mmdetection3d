@@ -1,4 +1,3 @@
-# Copyright (c) OpenMMLab. All rights reserved.
 import os
 import os.path as osp
 from functools import cmp_to_key
@@ -34,6 +33,9 @@ def _read_result(path):
             infos = json.loads(line.split('\t')[1])
             if 'labelData' not in infos.keys() and 'standardData' not in infos.keys():
                 continue
+            # 剔除空标注的数据帧
+            if 'labelData' in infos.keys() and infos['labelData'] == {}:
+                continue
             relative_path = infos['datasetsRelatedFiles'][0]['localRelativePath']
             relative_paths.append(relative_path)
             tmp_paths.append('files/' + relative_path.split('/')[1] + '/' + 
@@ -59,7 +61,7 @@ def _split_imageset(imageset_dir, frame_num):
 
     random.shuffle(trainval_idx)
     total = len(trainval_idx)
-    split_ratio = 0.8
+    split_ratio = 0.9
     split = (int)(total * split_ratio)
     print('{} splits {} to train, {} to val'.format(total, split, total-split))
 
@@ -189,7 +191,14 @@ class AICV2KITTI(object):
             if 'standardData' in infos.keys():
                 annotations = infos['standardData']
             elif 'labelData' in infos.keys():
-                annotations = infos['labelData']['result']
+                if 'result' in infos['labelData'].keys():
+                    annotations = infos['labelData']['result']
+                elif 'markData' in infos['labelData'].keys() and 'cube3d' in infos['labelData']['markData'].keys():
+                    annotations = infos['labelData']['markData']['cube3d']
+                else:
+                    annotations = []
+            else:
+                print('Error: Do not support this format!')
             # frame_id timestamp x y z qx qy qz qw
             pose = infos['poses']['velodyne_points']
             timestamp = infos['frameTimestamp']
@@ -263,6 +272,8 @@ class AICV2KITTI(object):
             type = annotation['type']
             size = annotation['size']
 
+            if type not in self.type_list:
+                continue
             type = self.aicv_to_kitti_class_map[type]
             if type not in self.selected_kitti_classes:
                 continue
@@ -286,9 +297,6 @@ class AICV2KITTI(object):
                 rotation_y += np.pi / 4
             if rotation_y > np.pi:
                 rotation_y -= 2 * np.pi
-
-            # if self.clean_data(type, l, w, h):
-            #     continue
 
             # [w, h, l] will transfose to [l, w, h] in get_label_anno() of kitti_data_utils.py
             line = type + \
@@ -325,25 +333,6 @@ class AICV2KITTI(object):
     def save_pose(self, pose, frame_idx):
         with open(osp.join(f'{self.pose_save_dir}/{str(frame_idx).zfill(6)}.txt'), 'w') as f:
             f.write(pose)
-
-    def clean_data(self, type, l, w, h):
-        """
-        clean data according to anchor_size, the up and down ratio is 4 and 0.25
-        """
-        if type == 'Car' and (
-            l > 17.8 or w > 7.68 or h > 6.6 or l < 1.1 or w < 0.48 or h < 0.1):
-            return True
-        elif type == 'Pedestrian' and (
-            l > 2.2 or w > 2.4 or h > 6.6 or l < 0.14 or w < 0.15 or h < 0.1):
-            return True
-        elif type == 'Bicycle' and (
-            l > 7.4 or w > 3.24 or h > 5.2 or l < 0.46 or w < 0.2 or h < 0.3):
-            return True
-        elif type == 'TrafficCone' and (
-            l > 1.44 or w > 1.44 or h > 2.6 or l < 0.09 or w < 0.09 or h < 0.16):
-            return True
-        else:
-            return False
 
     def create_folder(self):
         """Create folder for data preprocessing."""
@@ -396,6 +385,7 @@ def get_aicv_image_info(path,
         image_infos = executor.map(map_func, image_ids)
 
     return list(image_infos)
+
 
 def _calculate_num_points_in_gt(data_path,
                                       infos,

@@ -8,7 +8,7 @@ def parse_config():
     parser = argparse.ArgumentParser(description='arg parser')
     parser.add_argument('data', type=str, default='data', 
                         help='specify the point cloud data file or directory')
-    parser.add_argument('--dims', type=int, default=4, 
+    parser.add_argument('--dims', type=int, default=5, 
                         help='x, y, z, intensity, [timestamp], [elongation]')
     args = parser.parse_args()
     return args

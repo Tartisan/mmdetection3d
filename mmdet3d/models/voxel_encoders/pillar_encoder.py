@@ -47,14 +47,15 @@ class PillarFeatureNet(nn.Module):
                  point_cloud_range=(0, -40, -3, 70.4, 40, 1),
                  norm_cfg=dict(type='BN1d', eps=1e-3, momentum=0.01),
                  mode='max',
-                 legacy=True):
+                 legacy=True, 
+                 input_norm=False):
         super(PillarFeatureNet, self).__init__()
         assert len(feat_channels) > 0
         self.legacy = legacy
         if with_cluster_center:
             in_channels += 3
         if with_voxel_center:
-            in_channels += 3
+            in_channels += 2
         if with_distance:
             in_channels += 1
         self._with_distance = with_distance
@@ -89,6 +90,7 @@ class PillarFeatureNet(nn.Module):
         self.y_offset = self.vy / 2 + point_cloud_range[1]
         self.z_offset = self.vz / 2 + point_cloud_range[2]
         self.point_cloud_range = point_cloud_range
+        self.input_norm = input_norm
 
     @force_fp32(out_fp16=True)
     def forward(self, features, num_points, coors):
@@ -116,27 +118,27 @@ class PillarFeatureNet(nn.Module):
         dtype = features.dtype
         if self._with_voxel_center:
             if not self.legacy:
-                f_center = torch.zeros_like(features[:, :, :3])
+                f_center = torch.zeros_like(features[:, :, :2])
                 f_center[:, :, 0] = features[:, :, 0] - (
                     coors[:, 3].to(dtype).unsqueeze(1) * self.vx +
                     self.x_offset)
                 f_center[:, :, 1] = features[:, :, 1] - (
                     coors[:, 2].to(dtype).unsqueeze(1) * self.vy +
                     self.y_offset)
-                f_center[:, :, 2] = features[:, :, 2] - (
-                    coors[:, 1].to(dtype).unsqueeze(1) * self.vz +
-                    self.z_offset)
+                # f_center[:, :, 2] = features[:, :, 2] - (
+                #     coors[:, 1].to(dtype).unsqueeze(1) * self.vz +
+                #     self.z_offset)
             else:
-                f_center = features[:, :, :3]
+                f_center = features[:, :, :2]
                 f_center[:, :, 0] = f_center[:, :, 0] - (
                     coors[:, 3].type_as(features).unsqueeze(1) * self.vx +
                     self.x_offset)
                 f_center[:, :, 1] = f_center[:, :, 1] - (
                     coors[:, 2].type_as(features).unsqueeze(1) * self.vy +
                     self.y_offset)
-                f_center[:, :, 2] = f_center[:, :, 2] - (
-                    coors[:, 1].type_as(features).unsqueeze(1) * self.vz +
-                    self.z_offset)
+                # f_center[:, :, 2] = f_center[:, :, 2] - (
+                #     coors[:, 1].type_as(features).unsqueeze(1) * self.vz +
+                #     self.z_offset)
             features_ls.append(f_center)
 
         if self._with_distance:
@@ -145,6 +147,13 @@ class PillarFeatureNet(nn.Module):
 
         # Combine together feature decorations
         features = torch.cat(features_ls, dim=-1)
+
+        if self.input_norm:
+            features[:, :, 0] = features[:, :, 0] / self.point_cloud_range[3] # x
+            features[:, :, 1] = features[:, :, 1] / self.point_cloud_range[4] # y
+            features[:, :, 2] = features[:, :, 2] / self.point_cloud_range[5] # z
+            features[:, :, 3] = features[:, :, 3] / 255.0                     # intensity
+        
         # The feature decorations were calculated without regard to whether
         # pillar was empty. Need to ensure that
         # empty pillars remain set to zeros.
@@ -199,7 +208,8 @@ class DynamicPillarFeatureNet(PillarFeatureNet):
                  point_cloud_range=(0, -40, -3, 70.4, 40, 1),
                  norm_cfg=dict(type='BN1d', eps=1e-3, momentum=0.01),
                  mode='max',
-                 legacy=True):
+                 legacy=True,
+                 input_norm=False):
         super(DynamicPillarFeatureNet, self).__init__(
             in_channels,
             feat_channels,
@@ -210,7 +220,8 @@ class DynamicPillarFeatureNet(PillarFeatureNet):
             point_cloud_range=point_cloud_range,
             norm_cfg=norm_cfg,
             mode=mode,
-            legacy=legacy)
+            legacy=legacy,
+            input_norm=input_norm)
         self.fp16_enabled = False
         feat_channels = [self.in_channels] + list(feat_channels)
         pfn_layers = []
@@ -249,9 +260,9 @@ class DynamicPillarFeatureNet(PillarFeatureNet):
         """
         # Step 1: scatter voxel into canvas
         # Calculate necessary things for canvas creation
-        canvas_y = int(
+        canvas_y = round(
             (self.point_cloud_range[4] - self.point_cloud_range[1]) / self.vy)
-        canvas_x = int(
+        canvas_x = round(
             (self.point_cloud_range[3] - self.point_cloud_range[0]) / self.vx)
         canvas_channel = voxel_mean.size(1)
         batch_size = pts_coors[-1, 0] + 1
@@ -296,13 +307,13 @@ class DynamicPillarFeatureNet(PillarFeatureNet):
 
         # Find distance of x, y, and z from pillar center
         if self._with_voxel_center:
-            f_center = features.new_zeros(size=(features.size(0), 3))
+            f_center = features.new_zeros(size=(features.size(0), 2))
             f_center[:, 0] = features[:, 0] - (
                 coors[:, 3].type_as(features) * self.vx + self.x_offset)
             f_center[:, 1] = features[:, 1] - (
                 coors[:, 2].type_as(features) * self.vy + self.y_offset)
-            f_center[:, 2] = features[:, 2] - (
-                coors[:, 1].type_as(features) * self.vz + self.z_offset)
+            # f_center[:, 2] = features[:, 2] - (
+            #     coors[:, 1].type_as(features) * self.vz + self.z_offset)
             features_ls.append(f_center)
 
         if self._with_distance:
@@ -311,6 +322,11 @@ class DynamicPillarFeatureNet(PillarFeatureNet):
 
         # Combine together feature decorations
         features = torch.cat(features_ls, dim=-1)
+        if self.input_norm:
+            features[:, 0] = features[:, 0] / self.point_cloud_range[3] # x
+            features[:, 1] = features[:, 1] / self.point_cloud_range[4] # y
+            features[:, 2] = features[:, 2] / self.point_cloud_range[5] # z
+            features[:, 3] = features[:, 3] / 255.0                     #intensity
         for i, pfn in enumerate(self.pfn_layers):
             point_feats = pfn(features)
             voxel_feats, voxel_coors = self.pfn_scatter(point_feats, coors)

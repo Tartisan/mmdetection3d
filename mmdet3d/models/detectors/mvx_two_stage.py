@@ -39,8 +39,14 @@ class MVXTwoStageDetector(Base3DDetector):
                  init_cfg=None):
         super(MVXTwoStageDetector, self).__init__(init_cfg=init_cfg)
 
+        self.use_custom_voxel_layer = False
         if pts_voxel_layer:
-            self.pts_voxel_layer = Voxelization(**pts_voxel_layer)
+            if 'type' in pts_voxel_layer.keys():
+                self.use_custom_voxel_layer = True
+                self.pts_voxel_layer = builder.build_voxel_layer(
+                    pts_voxel_layer)
+            else:
+                self.pts_voxel_layer = Voxelization(**pts_voxel_layer)
         if pts_voxel_encoder:
             self.pts_voxel_encoder = builder.build_voxel_encoder(
                 pts_voxel_encoder)
@@ -454,7 +460,7 @@ class MVXTwoStageDetector(Base3DDetector):
                                             self.pts_bbox_head.test_cfg)
         return merged_bboxes
 
-    def show_results(self, data, result, out_dir):
+    def show_results(self, data, result, out_dir, show=False, score_thr=0.0):
         """Results visualization.
 
         Args:
@@ -500,4 +506,5 @@ class MVXTwoStageDetector(Base3DDetector):
                     f'Unsupported box_mode_3d {box_mode_3d} for conversion!')
 
             pred_bboxes = pred_bboxes.tensor.cpu().numpy()
-            show_result(points, None, pred_bboxes, out_dir, file_name)
+            show_result(points, None, pred_bboxes, out_dir, file_name, 
+                        show=show, snapshot=True)

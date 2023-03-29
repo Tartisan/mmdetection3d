@@ -38,7 +38,7 @@ def main():
         data,
         result,
         args.out_dir,
-        args.score_thr,
+        score_thr=args.score_thr,
         show=args.show,
         snapshot=args.snapshot,
         task='multi_modality-det')
